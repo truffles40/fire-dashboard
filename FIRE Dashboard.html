@@ -1,0 +1,2333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FIRE Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔥</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--bg2:#1a1d27;--bg3:#23273a;--bg4:#2e3349;
+  --accent:#5b8dee;--green:#34c98e;--red:#e85b5b;--yellow:#f0c94a;--teal:#5bd4ee;
+  --text:#e8eaf0;--text2:#9ca3b8;--text3:#636a88;
+  --border:#2e3349;--r:10px;--shadow:0 4px 24px rgba(0,0,0,.5);
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+  --sidebar-w:300px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.5;min-height:100vh;overflow-x:hidden}
+.app{display:flex;height:100vh;overflow:hidden;position:relative}
+.sidebar{width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;flex-shrink:0;transition:transform .25s ease;z-index:100}
+.main{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:300;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 9px;cursor:pointer;flex-direction:column;gap:4px}
+.hamburger span{display:block;width:18px;height:2px;background:var(--text);border-radius:2px;transition:all .2s}
+.hamburger.open span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.hamburger.open span:nth-child(2){opacity:0}
+.hamburger.open span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99}
+.overlay.visible{display:block}
+@media(max-width:768px){
+  .hamburger{display:flex}
+  .sidebar{position:fixed;top:0;left:0;height:100vh;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{padding:50px 10px 12px}
+  .metrics{grid-template-columns:1fr 1fr!important}
+  .dt, .sum-t { table-layout: auto !important; min-width: 900px !important; }
+  .sum-t { min-width: 550px !important; }
+}
+@media(max-width:480px){
+  .metrics{grid-template-columns:1fr!important}
+  .main-tab-btn{font-size:10px;padding:6px 8px!important;flex:1 0 auto!important;white-space:nowrap!important}
+  .sub-tab-btn{font-size:10px;padding:4px 8px!important;flex:1 0 auto!important;white-space:nowrap!important}
+}
+.sb-head{padding:14px 14px 10px;border-bottom:1px solid var(--border)}
+.sb-head h1{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.sb-head p{font-size:10px;color:var(--text3);margin-top:1px}
+.section{border-bottom:1px solid var(--border)}
+.sec-t{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;padding:9px 14px 7px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.sec-t .ch{transition:transform .2s;font-size:9px}
+.section.collapsed .sec-b{display:none}
+.section.collapsed .ch{transform:rotate(-90deg)}
+.sec-b{padding:0 14px 11px;display:flex;flex-direction:column;gap:6px}
+.field{display:flex;flex-direction:column}
+.field label{font-size:11px;color:var(--text2);height:28px;display:flex;align-items:flex-end;margin-bottom:3px;overflow:hidden;line-height:1.3}
+input[type=text],input[type=number],input[type=date],select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;font-family:var(--font);outline:none;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--accent)}
+input[type=checkbox]{width:auto;accent-color:var(--accent)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;align-items:end}
+.ci-wrap{position:relative}
+.ci-wrap input{padding-left:14px}
+.ci-prefix{position:absolute;left:7px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:12px;pointer-events:none}
+.btn{padding:5px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-family:var(--font);font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:#4a7de0}
+.btn-s{background:var(--bg3);color:var(--text);border:1px solid var(--border)}.btn-s:hover{background:var(--bg4)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mc-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px}
+.mc-val{font-size:18px;font-weight:700;margin-top:3px;line-height:1.2}
+.mc-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.sc-port-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;width:100%;gap:16px}
+.sc-port-name{display:flex;align-items:center;gap:5px;color:var(--text2)}
+.sc-port-val{font-weight:700;font-size:12px}
+.main-tab-bar{display:flex;gap:3px;background:var(--bg4);border-radius:9px;padding:3px;margin-bottom:0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.main-tab-bar::-webkit-scrollbar{display:none}
+.main-tab-btn{flex:1 0 auto !important;padding:8px 12px;text-align:center;border-radius:7px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-family:var(--font);font-weight:500;transition:all .15s;white-space:nowrap !important}
+.main-tab-btn.active{background:var(--accent);color:#fff;font-weight:700}
+.sub-tab-bar{display:flex;gap:2px;background:var(--bg3);border-radius:7px;padding:3px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.sub-tab-bar::-webkit-scrollbar{display:none}
+.sub-tab-btn{flex:1 0 auto !important;padding:5px 10px;text-align:center;border-radius:5px;border:none;background:transparent;color:var(--text2);cursor:pointer;font-size:11px;font-family:var(--font);transition:all .15s;white-space:nowrap !important}
+.sub-tab-btn.active{background:var(--bg4);color:var(--text);font-weight:600}
+.tw{display:flex;align-items:center;gap:6px}
+.toggle{position:relative;width:32px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.tsl{position:absolute;inset:0;background:var(--bg4);border-radius:18px;cursor:pointer;transition:.2s}
+.tsl:before{content:'';position:absolute;width:12px;height:12px;left:3px;bottom:3px;background:var(--text2);border-radius:50%;transition:.2s}
+input:checked+.tsl{background:var(--accent)}
+input:checked+.tsl:before{transform:translateX(14px);background:#fff}
+.tl{font-size:11px;color:var(--text2)}
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:16px}
+.modal-ov.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;width:min(780px,100%);max-height:92vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.modal-head h2{font-size:14px;font-weight:700}
+.modal-x{background:none;border:none;color:var(--text2);cursor:pointer;font-size:17px;line-height:1}.modal-x:hover{color:var(--text)}
+.range-container{position:relative;height:38px;margin:6px 4px 2px}
+.range-track{position:absolute;top:50%;transform:translateY(-50%);width:100%;height:4px;background:var(--bg4);border-radius:2px}
+.range-fill{position:absolute;top:50%;transform:translateY(-50%);height:4px;background:var(--accent);border-radius:2px}
+.range-input{position:absolute;top:50%;transform:translateY(-50%);width:100%;-webkit-appearance:none;appearance:none;background:transparent;pointer-events:none;height:4px}
+.range-input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);border:2px solid var(--bg2);cursor:pointer;pointer-events:all;box-shadow:0 1px 4px rgba(0,0,0,.4);transition:transform .15s}
+.range-input::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.range-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:2px}
+.dt{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;white-space:nowrap;table-layout:fixed}
+.dt th{background:var(--bg2);color:var(--text3);text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-weight:500;position:sticky;top:0;z-index:10;-webkit-transform:translateZ(0);transform:translateZ(0)}
+.dt th:first-child,.dt td:first-child{text-align:left}
+.dt td{padding:4px 8px;text-align:right;border-bottom:1px solid rgba(46,51,73,.3)}
+.dt tr:hover td{background:rgba(91,141,238,.04)}
+.milestone-row td:first-child{color:var(--yellow)}
+.goal-hit td{background:rgba(240,201,74,.06)!important}
+.port-col{font-weight:700}
+.ov-t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px}
+.ov-t th{color:var(--text3);text-align:left;padding:4px 7px;border-bottom:1px solid var(--border);font-weight:500;font-size:10px;position:sticky;top:0;background:var(--bg2);z-index:2}
+.ov-t td{padding:3px 7px;border-bottom:1px solid rgba(46,51,73,.35);vertical-align:middle}
+.ov-t input,.ov-t select{padding:2px 5px;font-size:11px;width:100px}
+.ov-hi{background:rgba(91,141,238,.08)!important}
+.restore{color:var(--accent);background:none;border:none;cursor:pointer;font-size:10px;text-decoration:underline;padding:0}
+.sum-t{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;table-layout:fixed}
+.sum-t th{background:var(--bg3);color:var(--text3);padding:6px 9px;text-align:center;border-bottom:1px solid var(--border);font-weight:500;font-size:10px;white-space:nowrap;position:sticky;top:0;z-index:2;overflow:hidden;text-overflow:ellipsis}
+.sum-t th:first-child{text-align:left}
+.sum-t td{padding:6px 9px;border-bottom:1px solid rgba(46,51,73,.35);text-align:center;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sum-t td:first-child{text-align:left}
+.sum-t tr:last-child td{border-bottom:none}
+.sc-name-cell{font-weight:600;display:flex;align-items:center;gap:5px}
+.gbadge{background:rgba(52,201,142,.15);color:var(--green);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;display:inline-block}
+.sc-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:7px}
+.sc-card-head{display:flex;align-items:center;gap:5px;padding:7px 9px;cursor:pointer;user-select:none}
+.sc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sc-name-inp{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:1px 3px;color:var(--text);font-weight:600;font-size:12px}
+.sc-name-inp:focus{outline:none;border-color:var(--accent)}
+.sc-x{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:1px 4px;border-radius:3px}.sc-x:hover{color:var(--red)}
+.sc-arr{color:var(--text3);font-size:9px;transition:transform .2s;margin-left:2px}
+.sc-card.open .sc-arr{transform:rotate(180deg)}
+.sc-body{padding:0 9px 9px;display:flex;flex-direction:column;gap:5px}
+.goal-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.goal-row input{flex:1}
+.goal-rm{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:1px 3px}.goal-rm:hover{color:var(--red)}
+.divider{height:1px;background:var(--border);margin:3px 0}
+.note{font-size:10px;color:var(--text3)}
+.pill{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.modal-seed{background:var(--bg3);border-radius:6px;padding:10px;margin-bottom:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--border)}
+.mode-badge{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-size:10px;color:var(--text2)}
+.chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chart-inner{position:relative;min-width:750px}
+.tax-calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:600px){.tax-calc-grid{grid-template-columns:1fr}}
+.tax-bkt-row{display:grid;grid-template-columns:80px 1fr 90px 90px 90px;gap:4px;font-size:11px;padding:4px 8px;border-bottom:1px solid rgba(46,51,73,.3);align-items:center}
+.tax-bkt-row.hdr{background:var(--bg3);font-weight:600;color:var(--text3);font-size:10px;position:sticky;top:0}
+.ss-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.ss-stat{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 13px}
+.ss-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.ss-stat-val{font-size:17px;font-weight:700;margin-top:2px}
+.ss-stat-sub{font-size:10px;color:var(--text3);margin-top:1px}
+* {scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+.comp-company-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.comp-company-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none}
+.comp-company-name{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-weight:600;font-size:13px;padding:2px 4px;font-family:var(--font)}
+.comp-company-name:focus{outline:none;border-color:var(--accent)}
+.comp-company-body{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+</style>
+</head>
+<body>
+<div class="app">
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sb-head">
+    <h1>🔥 FIRE Dashboard</h1><p>Financial Independence · Retire Early</p>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <button class="btn btn-p" id="save-btn" onclick="saveToFile()" style="flex:1;justify-content:center">💾 Save</button>
+      <button class="btn btn-s" id="load-btn" onclick="pickAndLoad()" style="padding:5px 10px;font-size:14px" title="Load from file">📂</button>
+    </div>
+    <div id="save-status" style="font-size:10px;color:var(--text3);margin-top:3px;height:14px;text-align:center"></div>
+    <div id="file-status" style="font-size:10px;margin-top:4px;display:flex;align-items:center;gap:6px;justify-content:center;min-height:16px"></div>
+  </div>
+  <div class="section" id="sec-global">
+    <div class="sec-t" onclick="toggleSec('sec-global')">Global Assumptions <span class="ch">▾</span></div>
+    <div class="sec-b">
+      <div class="g2">
+        <div class="field"><label>Market Return, nominal (%)</label><input type="number" id="g-return" value="7" step="0.1" min="0" max="30" onchange="recalc()"/></div>
+        <div class="field"><label>Withdrawal Rate (%)</label><input type="number" id="g-withdrawal" value="4" step="0.1" min="0.5" max="20" onchange="recalc()"/></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Start Age</label><input type="number" id="g-start-age" value="23" min="16" max="50" onchange="recalc()"/></div>
+        <div class="field"><label>End Age</label><input type="number" id="g-end-age" value="65" min="30" max="90" onchange="recalc()"/></div>
+      </div>
+      <div class="field"><label>Review Month</label>
+        <select id="g-start-month" onchange="recalc()">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div class="field"><label>Birthdate</label><input type="date" id="g-birthdate" onchange="recalc()" required/></div>
+      <div class="field"><label>Filing Status</label>
+        <select id="g-filing" onchange="recalc()">
+          <option value="single">Single</option><option value="mfj">Married Filing Jointly</option><option value="hoh">Head of Household</option>
+        </select>
+      </div>
+      <div class="field"><label>State</label><select id="g-state" onchange="recalc()"><option value="none">No State Income Tax</option></select></div>
+      <div class="field"><label>Starting Portfolio Balance ($)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="g-start-balance" value="0" oninput="fmtCI(this);recalc()" onchange="recalc()"/></div>
+      </div>
+    </div>
+  </div>
+  <div class="section" id="sec-inflation">
+    <div class="sec-t" onclick="toggleSec('sec-inflation')">Inflation &amp; NPV <span class="ch">▾</span></div>
+    <div class="sec-b">
+      <div class="g2">
+        <div class="field"><label>Inflation Rate (%)</label><input type="number" id="g-inflation-rate" value="3" step="0.1" min="0" max="20" onchange="recalc()"/></div>
+        <div class="field"><label>NPV Reference Year</label><input type="number" id="g-npv-year" value="2026" step="1" min="1980" max="2100" onchange="recalc()"/></div>
+      </div>
+      <p class="note">Tax brackets are always inflation-indexed to NPV ref year.</p>
+      <div class="divider"></div>
+      <div class="tw">
+        <label class="toggle"><input type="checkbox" id="g-show-npv" onchange="recalc()"/><span class="tsl"></span></label>
+        <span class="tl" id="npv-toggle-label">Showing: Future Nominal $</span>
+      </div>
+    </div>
+  </div>
+  <div class="section" id="sec-scenarios">
+    <div class="sec-t" onclick="toggleSec('sec-scenarios')">Scenarios <span class="ch">▾</span></div>
+    <div class="sec-b">
+      <p class="note">Salary, spending &amp; savings in NPV $.</p>
+      <div id="scenarios-list"></div>
+      <button class="btn btn-p" onclick="addScenario()">+ Add Scenario</button>
+    </div>
+  </div>
+  <div class="section" id="sec-payroll">
+    <div class="sec-t" onclick="toggleSec('sec-payroll')">Payroll Deductions <span class="ch">▾</span></div>
+    <div class="sec-b">
+      <div class="g2">
+        <div class="field"><label>SS Employee (%)</label><input type="number" id="g-ss" value="6.2" step="0.1" min="0" max="20" onchange="recalc()"/></div>
+        <div class="field"><label>SS Wage Cap ($)</label>
+          <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="g-ss-cap" value="176,100" oninput="fmtCI(this)" onchange="recalc()"/></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Medicare (%)</label><input type="number" id="g-medicare" value="1.45" step="0.05" min="0" onchange="recalc()"/></div>
+        <div class="field"><label>Add'l Medicare &gt;$200k (%)</label><input type="number" id="g-medicare-add" value="0.9" step="0.05" min="0" onchange="recalc()"/></div>
+      </div>
+      <div class="field"><label>401k Contribution (max $<span id="k401-limit-lbl">23,500</span>/yr)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="g-401k" value="0" oninput="fmtCI(this);clamp401k()" onchange="recalc()"/></div>
+      </div>
+      <div class="field"><label>401k Annual Limit ($)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="g-401k-limit" value="23,500" oninput="fmtCI(this);update401kLimitLbl();clamp401k()" onchange="recalc()"/></div>
+      </div>
+    </div>
+  </div>
+  <div class="section" id="sec-goals">
+    <div class="sec-t" onclick="toggleSec('sec-goals')">Goals &amp; Milestones <span class="ch">▾</span></div>
+    <div class="sec-b">
+      <p class="note">Dollar targets in NPV.</p>
+      <div id="goals-list"></div>
+      <button class="btn btn-s" onclick="addGoal()">+ Add Dollar Goal</button>
+      <div class="divider"></div>
+      <div class="field"><label>Milestone Ages (comma-separated)</label>
+        <input type="text" id="g-milestones" value="30,35,40,45,50,55,60,65" onchange="recalc()"/>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="metrics">
+    <div class="mc"><div class="mc-lbl">Today</div><div class="mc-val" id="m-today" style="font-size:14px;margin-top:4px">—</div><div class="mc-sub" id="m-today-sub">Current date</div></div>
+    <div class="mc"><div class="mc-lbl">End Age</div><div class="mc-val" id="m-end-age">65</div><div class="mc-sub" id="m-end-year">—</div></div>
+    <div class="mc"><div class="mc-lbl">Portfolio @ End — All Scenarios</div><div id="m-port-all" style="margin-top:4px"></div></div>
+    <div class="mc"><div class="mc-lbl">Dollar Display</div><div class="mc-val" style="font-size:12px;margin-top:5px" id="m-dollar-mode">💵 Future Nominal</div><div class="mc-sub" id="m-npv-ref">Infl: 3% | ref: 2026</div></div>
+    <div class="mc"><div class="mc-lbl">Real Return</div><div class="mc-val" id="m-real-return">—</div><div class="mc-sub">Nominal − Inflation</div></div>
+  </div>
+
+  <div class="main-tab-bar">
+    <button class="main-tab-btn active" onclick="switchMain('fire',this)">🔥 FIRE Scenarios</button>
+    <button class="main-tab-btn" onclick="switchMain('tax',this)">🧾 Tax Analysis</button>
+    <button class="main-tab-btn" onclick="switchMain('ss',this)">👴 Social Security</button>
+    <button class="main-tab-btn" onclick="switchMain('npv',this)">📐 NPV Calculator</button>
+  </div>
+
+  <!-- ══ FIRE SCENARIOS ══ -->
+  <div id="main-fire">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn active" onclick="switchSub('fire','summary',this)">🏁 Summary</button>
+      <button class="sub-tab-btn" onclick="switchSub('fire','projection',this)">📋 Projection</button>
+      <button class="sub-tab-btn" onclick="switchSub('fire','portfolio',this)">📈 Portfolio</button>
+      <button class="sub-tab-btn" onclick="switchSub('fire','breakdown',this)">📊 Breakdown</button>
+      <button class="sub-tab-btn" onclick="switchSub('fire','actualized',this)">✅ Actualized</button>
+      <button class="sub-tab-btn" onclick="switchSub('fire','comp',this)">💼 Compensation</button>
+    </div>
+    <div id="fire-summary">
+      <div class="card"><div class="card-title">Scenario vs. Goals <span id="summary-badge" class="mode-badge">💵 Future Nominal</span></div><div style="overflow-x:auto"><table class="sum-t" id="goal-table"><tbody></tbody></table></div></div>
+      <div class="card" style="margin-top:12px"><div class="card-title">Portfolio at Milestone Ages <span id="milestone-badge" class="mode-badge">💵 Future Nominal</span></div><div style="overflow-x:auto"><table class="sum-t" id="milestone-table"><tbody></tbody></table></div></div>
+    </div>
+    <div id="fire-projection" style="display:none">
+      <div class="card">
+        <div class="card-title"><span id="proj-title">Projection Table</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span id="proj-badge" class="mode-badge">💵 Future Nominal</span>
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2)"><input type="checkbox" id="proj-expand" onchange="renderProjTable()"/> Tax detail</label>
+          </div>
+        </div>
+        <div style="overflow-x:auto;max-height:540px"><table class="dt"><thead id="proj-thead"></thead><tbody id="proj-tbody"></tbody></table></div>
+      </div>
+    </div>
+    <div id="fire-portfolio" style="display:none">
+      <div class="card">
+        <div class="card-title"><span id="port-chart-title">Portfolio Balance Over Time</span><span style="font-size:10px;color:var(--text3)">Dashed = Goals &nbsp;⬥ Milestones</span></div>
+        <div style="padding:0 4px">
+          <div class="range-container" id="range-container">
+            <div class="range-track"></div><div class="range-fill" id="range-fill"></div>
+            <input type="range" class="range-input" id="slider-from" min="0" max="42" value="0" oninput="onSlider()"/>
+            <input type="range" class="range-input" id="slider-to" min="0" max="42" value="42" oninput="onSlider()"/>
+          </div>
+          <div class="range-labels"><span>Age <strong id="slider-from-lbl">23</strong></span><span>Age <strong id="slider-to-lbl">65</strong></span></div>
+        </div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:380px;margin-top:8px"><canvas id="chart-portfolio"></canvas></div></div>
+      </div>
+    </div>
+    <div id="fire-breakdown" style="display:none">
+      <div class="card">
+        <div class="card-title"><span id="bar-chart-title">Annual Breakdown &amp; Savings Rate</span>
+          <select id="bar-sc-sel" style="font-size:11px;padding:3px 7px;width:auto" onchange="S.lastBreakdownSc=parseInt(this.value)||0;renderBreakdownChart()"></select>
+        </div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:360px"><canvas id="chart-breakdown"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title"><span id="split-chart-title">Portfolio Split — 401k vs Brokerage/Cash</span></div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:300px"><canvas id="chart-split"></canvas></div></div>
+      </div>
+    </div>
+    <div id="fire-actualized" style="display:none">
+      <div class="card">
+        <div class="card-title">Actualized Portfolio
+          <span class="note">Actual data for completed review years only. Click a row to enter details.</span>
+        </div>
+        <div style="overflow-x:auto;max-height:560px">
+          <table class="dt" id="act-table"><thead id="act-thead"></thead><tbody id="act-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div id="fire-comp" style="display:none">
+      <div class="card">
+        <div class="card-title">Total Compensation Summary <span class="note" style="font-weight:400">by calendar year</span></div>
+        <div style="overflow-x:auto"><table class="dt" id="comp-summary-table"><thead id="comp-summary-thead"></thead><tbody id="comp-summary-tbody"></tbody></table></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Base Salary &amp; Benefits by Year <button class="btn btn-p btn-sm" onclick="addCompYear()">+ Add Year</button></div>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:560px">
+            <thead><tr>
+              <th style="text-align:left;width:80px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Year</th>
+              <th style="width:150px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Base Salary ($)</th>
+              <th style="width:140px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">401k Employee ($)</th>
+              <th style="width:100px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Match (%)</th>
+              <th style="width:120px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Cap (% sal.)</th>
+              <th style="width:120px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0;color:var(--green)">Employer Match</th>
+              <th style="width:36px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);position:sticky;top:0"></th>
+            </tr></thead>
+            <tbody id="comp-salary-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">RSU Grants <button class="btn btn-p btn-sm" onclick="addCompany()">+ Add Company</button></div>
+        <div id="comp-companies"></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">ESPP (Employee Stock Purchase Plan)</div>
+        <div class="g2">
+          <div class="field"><label>Contribution (% of salary)</label><input type="number" id="comp-espp-pct" value="10" step="0.5" min="0" max="15" onblur="renderComp()"/></div>
+          <div class="field"><label>Discount (%)</label><input type="number" id="comp-espp-disc" value="15" step="0.5" min="0" max="15" onblur="renderComp()"/></div>
+        </div>
+        <p class="note" style="margin-top:6px">ESPP income = Salary × Contribution% × Discount% ÷ (1 − Discount%).</p>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">RSU Vest Event Detail</div>
+        <div style="overflow-x:auto;max-height:500px">
+          <table class="dt" id="comp-rsu-detail-table">
+            <thead><tr>
+              <th style="text-align:left">Company</th><th style="text-align:left">Grant Date</th><th>Vest Date</th>
+              <th>Shares</th><th>Grant FMV</th><th>Vest FMV</th><th>Income ($)</th>
+              <th>Sold</th><th>Sale Date</th><th>Sale Price</th>
+              <th>ST Gain</th><th>LT Gain</th><th>ST Tax</th><th>LT Tax</th><th>NIIT</th><th>Total Tax</th>
+            </tr></thead>
+            <tbody id="comp-rsu-detail-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TAX ANALYSIS ══ -->
+  <div id="main-tax" style="display:none">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn active" onclick="switchSub('tax','taxoverview',this)">📊 Tax Breakdown</button>
+      <button class="sub-tab-btn" onclick="switchSub('tax','taxcalc',this)">🧮 Tax Calculator</button>
+    </div>
+    <div id="tax-taxoverview">
+      <div class="card">
+        <div class="card-title">Annual Tax Breakdown by Year
+          <select id="tax-sc-sel" style="font-size:11px;padding:3px 7px;width:auto" onchange="S.lastTaxSc=parseInt(this.value)||0;renderTaxChart()"></select>
+        </div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:320px"><canvas id="chart-tax"></canvas></div></div>
+      </div>
+    </div>
+    <div id="tax-taxcalc" style="display:none">
+      <div class="card">
+        <div class="card-title">Tax Calculator — Any Salary, Any State</div>
+        <div class="tax-calc-grid">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="field"><label>Gross Salary ($)</label>
+              <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="calc-salary" value="100,000" oninput="fmtCI(this);runTaxCalc()" onchange="runTaxCalc()"/></div>
+            </div>
+            <div class="field"><label>Filing Status</label>
+              <select id="calc-filing" onchange="runTaxCalc()">
+                <option value="single">Single</option><option value="mfj">Married Filing Jointly</option><option value="hoh">Head of Household</option>
+              </select>
+            </div>
+            <div class="field"><label>State</label><select id="calc-state" onchange="runTaxCalc()"><option value="none">No State Income Tax</option></select></div>
+            <p class="note">Uses 2026 federal brackets as-is. No inflation adjustment.</p>
+          </div>
+          <div id="tax-calc-results" style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px"></div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="card-title" style="margin-bottom:6px">Federal Bracket Detail</div>
+          <div id="calc-fed-brackets"></div>
+          <div class="card-title" style="margin-bottom:6px;margin-top:12px">State Bracket Detail</div>
+          <div id="calc-state-brackets"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SOCIAL SECURITY ══ -->
+  <div id="main-ss" style="display:none">
+    <div class="sub-tab-bar">
+      <button class="sub-tab-btn active" onclick="switchSub('ss','ssproj',this)">📈 SS Projection</button>
+      <button class="sub-tab-btn" onclick="switchSub('ss','ssbreakeven',this)">⚖️ Breakeven</button>
+      <button class="sub-tab-btn" onclick="switchSub('ss','sswhatif',this)">🔮 What-If</button>
+    </div>
+    <div id="ss-ssproj">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:160px"><label>Scenario</label>
+          <select id="ss-sc-sel" style="width:100%" onchange="S.lastSSSc=parseInt(this.value)||0;renderSSAll()"></select>
+        </div>
+        <div class="field" style="flex:1;min-width:120px"><label>SS COLA (%/yr)</label>
+          <input type="number" id="ss-cola" value="2.6" step="0.1" min="0" max="10" onchange="renderSSAll()"/>
+        </div>
+      </div>
+      <div class="ss-stat-grid" id="ss-stats"></div>
+      <div class="card">
+        <div class="card-title">Projected Monthly SS Benefit by Claim Age</div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:300px"><canvas id="chart-ss-benefit"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">AIME Earnings History</div>
+        <div style="overflow-x:auto;max-height:400px"><table class="dt" id="ss-aime-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div id="ss-ssbreakeven" style="display:none">
+      <div class="card">
+        <div class="card-title">Cumulative NPV of SS Benefits by Claim Age (62–70)</div>
+        <div class="chart-scroll"><div class="chart-inner" style="height:380px"><canvas id="chart-ss-breakeven"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:12px"><div class="card-title">Breakeven Ages</div><div id="ss-breakeven-table"></div></div>
+    </div>
+    <div id="ss-sswhatif" style="display:none">
+      <div class="card">
+        <div class="card-title">What-If: Continue Working to 62 / 67 vs. Early Retirement</div>
+        <p class="note" style="margin-bottom:10px">Shows the SS benefit impact of working additional years at your last salary vs. stopping at your scenario's end age.</p>
+        <div class="chart-scroll"><div class="chart-inner" style="height:300px"><canvas id="chart-ss-whatif"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:12px" id="ss-whatif-table-card">
+        <div class="card-title">What-If Comparison</div><div id="ss-whatif-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ NPV CALCULATOR ══ -->
+  <div id="main-npv" style="display:none">
+    <div class="card">
+      <div class="card-title">NPV / FV Calculator</div>
+      <p class="note" style="margin-bottom:14px">Leave exactly one field blank — the calculator will solve for the missing value.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+        <div class="field"><label>Present Value (PV $)</label>
+          <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="npv-pv" placeholder="Leave blank to solve" oninput="fmtCI(this)"/></div></div>
+        <div class="field"><label>Future Value (FV $)</label>
+          <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="npv-fv" placeholder="Leave blank to solve" oninput="fmtCI(this)"/></div></div>
+        <div class="field"><label>Years (N)</label><input type="number" id="npv-n" min="0" step="0.5" placeholder="Leave blank to solve"/></div>
+        <div class="field"><label>Annual Growth Rate (%)</label><input type="number" id="npv-r" min="0" step="0.1" placeholder="Leave blank to solve"/></div>
+        <div class="field"><label>Annual Payment / PMT ($) <span class="note">+ = deposit, − = withdrawal</span></label>
+          <input type="text" id="npv-pmt" placeholder="0 (negative to withdraw)" oninput="fmtCISigned(this)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;font-family:var(--font);outline:none"/></div>
+      </div>
+      <button class="btn btn-p" onclick="calcNPV()" style="margin-bottom:14px">Calculate</button>
+      <div id="npv-error" class="note" style="color:var(--red);margin-bottom:8px"></div>
+      <div id="npv-result" style="background:var(--bg3);border-radius:8px;padding:14px;display:none">
+        <div id="npv-result-content" style="display:flex;flex-direction:column;gap:8px;font-size:13px"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- SALARY MODAL -->
+<div class="modal-ov" id="salary-modal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="salary-modal-title">Salary Schedule</h2><button class="modal-x" onclick="closeModal('salary-modal')">✕</button></div>
+    <div class="modal-seed">
+      <p class="note">All values nominal. Growth compounds from previous year. Overrides chain forward.</p>
+      <div class="g3">
+        <div class="field"><label>Starting Salary ($)</label><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="sc-start-salary" oninput="fmtCI(this)" onchange="onSeedSalaryChange()"/></div></div>
+        <div class="field"><label>Growth Type</label>
+          <select id="sc-growth-type" onchange="onSeedSalaryChange()">
+            <option value="none">No Growth</option><option value="pct">Annual Growth (%)</option><option value="fixed">Fixed $ / Year</option>
+          </select>
+        </div>
+        <div class="field"><label id="sc-growth-val-lbl">Growth</label><input type="number" id="sc-growth-val" min="0" step="0.1" onchange="onSeedSalaryChange()"/></div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:420px">
+      <table class="ov-t"><thead><tr><th>Age</th><th>Year</th><th>Seeded</th><th>Override</th><th></th></tr></thead><tbody id="salary-tbody"></tbody></table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="clearScSalary()">Clear Overrides</button>
+      <button class="btn btn-p" onclick="closeModal('salary-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPENDING MODAL -->
+<div class="modal-ov" id="spending-modal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="spending-modal-title">Spending Schedule</h2><button class="modal-x" onclick="closeModal('spending-modal')">✕</button></div>
+    <div class="modal-seed">
+      <p class="note">All values nominal. Growth compounds from previous year. Overrides chain forward.</p>
+      <div class="g3">
+        <div class="field"><label>Default Annual Spending ($)</label><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="sc-default-spending" oninput="fmtCI(this)" onchange="onSeedSpendingChange()"/></div></div>
+        <div class="field"><label>Growth Type</label>
+          <select id="sc-spending-growth-type" onchange="onSeedSpendingChange()">
+            <option value="none">No Growth</option><option value="pct">Annual Growth (%)</option><option value="fixed">Fixed $ / Year</option>
+          </select>
+        </div>
+        <div class="field"><label id="sc-spending-growth-val-lbl">Growth</label><input type="number" id="sc-spending-growth-val" min="0" step="0.1" onchange="onSeedSpendingChange()"/></div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:420px">
+      <table class="ov-t"><thead><tr><th>Age</th><th>Year</th><th>Seeded</th><th>Override</th><th></th></tr></thead><tbody id="spending-tbody"></tbody></table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="clearScSpending()">Clear Overrides</button>
+      <button class="btn btn-p" onclick="closeModal('spending-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVINGS MODAL -->
+<div class="modal-ov" id="savings-modal">
+  <div class="modal">
+    <div class="modal-head"><h2 id="savings-modal-title">Savings Schedule</h2><button class="modal-x" onclick="closeModal('savings-modal')">✕</button></div>
+    <div class="modal-seed">
+      <p class="note">All values nominal. Select type once — overrides use the same type. Growth only available for Fixed $ / Year.</p>
+      <div class="g2">
+        <div class="field"><label>Default Type</label>
+          <select id="sc-savings-type" onchange="onSeedSavingsChange()"><option value="pct">% of Net Income</option><option value="dollar">Fixed $ / Year</option></select>
+        </div>
+        <div class="field"><label id="sc-savings-default-lbl">Default Value</label><input type="number" id="sc-savings-default" min="0" step="1" onchange="onSeedSavingsChange()"/></div>
+      </div>
+      <div id="sc-savings-growth-row" style="display:none">
+        <div class="g3" style="margin-top:6px">
+          <div class="field"><label>Growth Type</label>
+            <select id="sc-savings-growth-type" onchange="onSeedSavingsChange()">
+              <option value="none">No Growth</option><option value="pct">Annual Growth (%)</option><option value="fixed">Fixed $ / Year</option>
+            </select>
+          </div>
+          <div class="field"><label id="sc-savings-growth-val-lbl">Growth Amount</label><input type="number" id="sc-savings-growth-val" min="0" step="0.1" onchange="onSeedSavingsChange()"/></div>
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:420px">
+      <table class="ov-t"><thead><tr><th>Age</th><th>Year</th><th>Default</th><th>Type</th><th>Value</th><th></th></tr></thead><tbody id="savings-tbody"></tbody></table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="clearScSavings()">Clear Overrides</button>
+      <button class="btn btn-p" onclick="closeModal('savings-modal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACTUALIZED ROW MODAL -->
+<div class="modal-ov" id="act-modal">
+  <div class="modal" style="width:min(540px,100%)">
+    <div class="modal-head"><h2 id="act-modal-title">Enter Actual Data</h2><button class="modal-x" onclick="closeModal('act-modal')">✕</button></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="g2">
+        <div class="field"><label>Filing Status</label>
+          <select id="act-filing"><option value="single">Single</option><option value="mfj">Married Filing Jointly</option><option value="hoh">Head of Household</option></select>
+        </div>
+        <div class="field"><label>State</label><select id="act-state"><option value="none">No State Income Tax</option></select></div>
+      </div>
+      <div class="field"><label>Gross Salary ($)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="act-gross" oninput="fmtCI(this);calcActRow()"/></div>
+      </div>
+      <div style="background:var(--bg3);border-radius:6px;padding:10px;font-size:11px" id="act-tax-preview"></div>
+      <div class="field"><label>Annual Spend ($)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="act-spend" oninput="fmtCI(this);calcActRow()"/></div>
+      </div>
+      <div class="field"><label>Portfolio at Year End ($)</label>
+        <div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" id="act-portfolio" oninput="fmtCI(this);calcActRow()"/></div>
+      </div>
+      <div style="background:var(--bg3);border-radius:6px;padding:10px;font-size:11px" id="act-calc-preview"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-s" onclick="clearActRow()">Clear Row</button>
+      <button class="btn btn-p" onclick="saveActRow()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// CONSTANTS
+// ════════════════════════════════════════════
+const CUR_YEAR=2026;
+const COLORS=['#5b8dee','#34c98e','#ee875b','#7c5bde','#f0c94a','#e85b5b','#5bd4ee','#ee5bb5','#a8ee5b','#eea85b'];
+let editingSc=null;
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let S={
+  marketReturn:7,withdrawalRate:4,startAge:23,endAge:65,startMonth:1,
+  birthdate:'',filing:'single',stateCode:'none',startBalance:0,
+  inflationRate:3,npvYear:2026,showNPV:false,
+  ss:6.2,ssCap:176100,medicare:1.45,medicareAdd:0.9,k401:0,k401limit:23500,
+  goals:[],milestones:[30,35,40,45,50,55,60,65],
+  scenarios:[],
+  lastBreakdownSc:0,lastTaxSc:0,lastSSSc:0,
+  actualized:{},
+  comp:{salaryYears:[],companies:[],espp:{pct:10,disc:15}}
+};
+
+// ════════════════════════════════════════════
+// COMMA INPUTS
+// ════════════════════════════════════════════
+function fmtCI(el){const raw=el.value.replace(/[^0-9]/g,'');if(!raw){el.value='';return;}el.value=parseInt(raw,10).toLocaleString('en-US');}
+function fmtCISigned(el){
+  const neg=el.value.trimStart().startsWith('-');
+  const raw=el.value.replace(/[^0-9]/g,'');
+  if(!raw){el.value=neg?'-':'';return;}
+  el.value=(neg?'-':'')+parseInt(raw,10).toLocaleString('en-US');
+}
+function ciVal(id){const el=document.getElementById(id);if(!el)return 0;return parseFloat(el.value.replace(/,/g,''))||0;}
+function setCIVal(id,n){const el=document.getElementById(id);if(!el)return;el.value=n?Math.round(n).toLocaleString('en-US'):'0';}
+function update401kLimitLbl(){document.getElementById('k401-limit-lbl').textContent=Math.round(ciVal('g-401k-limit')).toLocaleString();}
+function clamp401k(){const lim=ciVal('g-401k-limit'),cur=ciVal('g-401k');if(cur>lim)setCIVal('g-401k',lim);}
+
+// ════════════════════════════════════════════
+// FEDERAL TAX 2026 (IRS Rev. Proc. 2025-28)
+// Brackets are base values at npvYear. All projections scale by taxMul.
+// ════════════════════════════════════════════
+const FED={
+  single:{std:15700,b:[[12100,.10],[49150,.12],[105225,.22],[200700,.24],[254900,.32],[636350,.35],[Infinity,.37]]},
+  mfj:  {std:31400,b:[[24200,.10],[98300,.12],[210450,.22],[401400,.24],[509800,.32],[762500,.35],[Infinity,.37]]},
+  hoh:  {std:23050,b:[[17300,.10],[65900,.12],[105225,.22],[200700,.24],[254900,.32],[636350,.35],[Infinity,.37]]}
+};
+
+// mul = inflation multiplier to scale brackets & std deduction
+// Standard deduction and all thresholds scale by mul (inflation-indexed)
+function calcFedTax(gross,filing,k401d=0,mul=1){
+  const fd=FED[filing];
+  const std=fd.std*mul;
+  const ti=Math.max(0,gross-std-k401d);
+  let tax=0,prev=0;
+  for(const [cap,r] of fd.b){
+    const scaledCap=cap===Infinity?Infinity:cap*mul;
+    if(ti<=prev)break;
+    tax+=(Math.min(ti,scaledCap)-prev)*r;
+    prev=scaledCap;
+    if(cap===Infinity)break;
+  }
+  return tax;
+}
+
+function fedBracketDetail(gross,filing,k401d=0,mul=1){
+  const fd=FED[filing];
+  const std=fd.std*mul;
+  const ti=Math.max(0,gross-std-k401d);
+  const rows=[];let prev=0,totalTax=0;
+  for(const [cap,r] of fd.b){
+    const scaledCap=cap===Infinity?Infinity:cap*mul;
+    if(ti<=prev)break;
+    const low=prev,high=Math.min(ti,scaledCap);
+    const taxed=high-low;const tax=taxed*r;
+    totalTax+=tax;
+    rows.push({low:low+std,high:(cap===Infinity?Infinity:scaledCap+std),rate:r,taxed,tax});
+    prev=scaledCap;if(cap===Infinity)break;
+  }
+  return{rows,totalTax,ti,std};
+}
+
+// ════════════════════════════════════════════
+// STATE TAX — 2025/2026 rates (single filer)
+// Progressive brackets scale by mul. Flat rates stay flat (rate doesn't change).
+// ════════════════════════════════════════════
+const ST={
+  AL:{name:'Alabama',type:'p',std:3000,b:[[500,.02],[3000,.04],[Infinity,.05]]},
+  AZ:{name:'Arizona',type:'f',rate:.025},
+  AR:{name:'Arkansas',type:'p',std:2340,b:[[4300,.02],[8500,.04],[Infinity,.044]]},
+  CA:{name:'California',type:'p',std:5540,b:[[10756,.01],[25499,.02],[40245,.04],[55866,.06],[70606,.08],[360659,.093],[432787,.103],[721314,.113],[1000000,.123],[Infinity,.133]]},
+  CO:{name:'Colorado',type:'f',rate:.044},
+  CT:{name:'Connecticut',type:'p',std:15000,b:[[10000,.02],[50000,.045],[100000,.055],[200000,.06],[250000,.065],[500000,.069],[Infinity,.0699]]},
+  DE:{name:'Delaware',type:'p',std:3250,b:[[2000,0],[5000,.022],[10000,.039],[20000,.048],[25000,.052],[60000,.055],[Infinity,.066]]},
+  GA:{name:'Georgia',type:'f',rate:.0539},
+  HI:{name:'Hawaii',type:'p',std:2200,b:[[2400,.014],[4800,.032],[9600,.055],[14400,.064],[19200,.068],[24000,.072],[36000,.076],[48000,.079],[175000,.0825],[350000,.09],[Infinity,.11]]},
+  ID:{name:'Idaho',type:'f',rate:.05695},
+  IL:{name:'Illinois',type:'f',rate:.0495},
+  IN:{name:'Indiana',type:'f',rate:.0305},
+  IA:{name:'Iowa',type:'f',rate:.038},
+  KS:{name:'Kansas',type:'p',std:3500,b:[[23000,.055],[Infinity,.057]]},
+  KY:{name:'Kentucky',type:'f',rate:.04},
+  LA:{name:'Louisiana',type:'f',rate:.03},
+  ME:{name:'Maine',type:'p',std:14600,b:[[26050,.058],[61600,.0675],[Infinity,.0715]]},
+  MD:{name:'Maryland',type:'p',std:2550,b:[[1000,.02],[2000,.03],[3000,.04],[100000,.0475],[125000,.05],[150000,.0525],[250000,.055],[Infinity,.0575]]},
+  MA:{name:'Massachusetts',type:'p',std:0,b:[[1000000,.05],[Infinity,.09]]},
+  MI:{name:'Michigan',type:'f',rate:.0405},
+  MN:{name:'Minnesota',type:'p',std:14575,b:[[31690,.0535],[104090,.068],[193240,.0785],[Infinity,.0985]]},
+  MS:{name:'Mississippi',type:'f',rate:.047},
+  MO:{name:'Missouri',type:'p',std:21900,b:[[1121,.015],[2242,.02],[3363,.025],[4484,.03],[5605,.035],[6726,.04],[7847,.045],[8968,.05],[Infinity,.048]]},
+  MT:{name:'Montana',type:'p',std:14600,b:[[20500,.047],[Infinity,.059]]},
+  NE:{name:'Nebraska',type:'p',std:7900,b:[[3700,.0246],[22170,.0351],[35730,.0501],[Infinity,.0529]]},
+  NJ:{name:'New Jersey',type:'p',std:1000,b:[[20000,.014],[35000,.0175],[40000,.035],[75000,.05525],[500000,.0637],[1000000,.0897],[Infinity,.1075]]},
+  NM:{name:'New Mexico',type:'p',std:14600,b:[[5500,.017],[11000,.032],[16000,.047],[210000,.049],[Infinity,.059]]},
+  NY:{name:'New York',type:'p',std:8000,b:[[17150,.04],[23600,.045],[27900,.0525],[161550,.0585],[323200,.0625],[2155350,.0685],[5000000,.0965],[25000000,.103],[Infinity,.109]]},
+  NC:{name:'North Carolina',type:'f',rate:.045},
+  ND:{name:'North Dakota',type:'p',std:14600,b:[[47150,0],[Infinity,.02]]},
+  OH:{name:'Ohio',type:'p',std:2400,b:[[26050,0],[100000,.02765],[115300,.0333],[Infinity,.035]]},
+  OK:{name:'Oklahoma',type:'p',std:6350,b:[[1000,.0025],[2500,.0075],[3750,.0175],[4900,.0275],[7200,.0375],[Infinity,.0475]]},
+  OR:{name:'Oregon',type:'p',std:2745,b:[[4050,.0475],[10200,.0675],[125000,.0875],[Infinity,.099]]},
+  PA:{name:'Pennsylvania',type:'f',rate:.0307},
+  RI:{name:'Rhode Island',type:'p',std:10550,b:[[77450,.0375],[176050,.0475],[Infinity,.0599]]},
+  SC:{name:'South Carolina',type:'p',std:14600,b:[[3460,0],[17330,.03],[Infinity,.062]]},
+  UT:{name:'Utah',type:'f',rate:.0455},
+  VT:{name:'Vermont',type:'p',std:6500,b:[[45400,.0335],[110050,.066],[229550,.076],[Infinity,.0875]]},
+  VA:{name:'Virginia',type:'p',std:8500,b:[[3000,.02],[5000,.03],[17000,.05],[Infinity,.0575]]},
+  WV:{name:'West Virginia',type:'p',std:2000,b:[[10000,.0236],[25000,.032],[40000,.0636],[60000,.073],[Infinity,.065]]},
+  WI:{name:'Wisconsin',type:'p',std:13230,b:[[14320,.0354],[28640,.0465],[315310,.053],[Infinity,.0765]]},
+  DC:{name:'District of Columbia',type:'p',std:14600,b:[[10000,.04],[40000,.06],[60000,.065],[350000,.085],[1000000,.0925],[Infinity,.1075]]}
+};
+
+function calcStTax(gross,code,mul=1){
+  if(code==='none')return 0;
+  const s=ST[code];if(!s)return 0;
+  if(s.type==='f')return gross*s.rate; // flat rate: no bracket to inflate
+  const std=(s.std||0)*mul;
+  const ti=Math.max(0,gross-std);
+  let tax=0,prev=0;
+  for(const [cap,r] of s.b){
+    const scaledCap=cap===Infinity?Infinity:cap*mul;
+    if(ti<=prev)break;
+    tax+=(Math.min(ti,scaledCap)-prev)*r;
+    prev=scaledCap;if(cap===Infinity)break;
+  }
+  return tax;
+}
+
+function stBracketDetail(gross,code,mul=1){
+  if(code==='none')return{rows:[],totalTax:0,type:'none'};
+  const s=ST[code];if(!s)return{rows:[],totalTax:0,type:'none'};
+  if(s.type==='f'){const tax=gross*s.rate;return{rows:[{low:0,high:Infinity,rate:s.rate,taxed:gross,tax}],totalTax:tax,type:'flat',name:s.name};}
+  const std=(s.std||0)*mul;
+  const ti=Math.max(0,gross-std);
+  const rows=[];let prev=0,totalTax=0;
+  for(const [cap,r] of s.b){
+    const scaledCap=cap===Infinity?Infinity:cap*mul;
+    if(ti<=prev)break;
+    const low=prev,high=Math.min(ti,scaledCap);
+    const taxed=high-low;const tax=taxed*r;
+    totalTax+=tax;
+    rows.push({low:low+std,high:(cap===Infinity?Infinity:scaledCap+std),rate:r,taxed,tax});
+    prev=scaledCap;if(cap===Infinity)break;
+  }
+  return{rows,totalTax,type:'progressive',name:s.name};
+}
+
+// ════════════════════════════════════════════
+// INFLATION MULTIPLIER
+// taxMul(age): scale factor to inflate bracket thresholds for a given projection year
+// taxMul(year): same but by calendar year (for standalone calculator)
+// ════════════════════════════════════════════
+function taxMulForAge(age){
+  return Math.pow(1+S.inflationRate/100,ageYear(age)-CUR_YEAR);
+}
+function taxMulForYear(year){
+  return Math.pow(1+S.inflationRate/100,year-CUR_YEAR);
+}
+
+// ════════════════════════════════════════════
+// SSA AVERAGE WAGE INDEX (1951-2023)
+// ════════════════════════════════════════════
+const AWI_RAW={
+  1951:2799.16,1952:2973.32,1953:3139.44,1954:3155.64,1955:3301.44,
+  1956:3532.36,1957:3641.72,1958:3673.80,1959:3855.80,1960:4007.12,
+  1961:4086.76,1962:4291.40,1963:4396.64,1964:4576.32,1965:4658.72,
+  1966:4938.36,1967:5213.44,1968:5571.76,1969:5893.76,1970:6186.24,
+  1971:6497.08,1972:7133.80,1973:7580.16,1974:8030.76,1975:8630.92,
+  1976:9226.48,1977:9779.44,1978:10556.03,1979:11479.46,1980:12513.46,
+  1981:13773.10,1982:14531.34,1983:15239.24,1984:16135.07,1985:16822.51,
+  1986:17321.82,1987:18426.51,1988:19334.04,1989:20099.55,1990:21027.98,
+  1991:21811.60,1992:22935.42,1993:23132.67,1994:23753.53,1995:24705.66,
+  1996:25913.90,1997:27426.00,1998:28861.44,1999:30469.84,2000:32154.82,
+  2001:32921.92,2002:33252.09,2003:34064.95,2004:35648.55,2005:36952.94,
+  2006:38651.41,2007:40405.48,2008:41334.97,2009:40711.61,2010:41673.83,
+  2011:42979.61,2012:44321.67,2013:44888.16,2014:46481.52,2015:48098.63,
+  2016:48642.15,2017:50321.89,2018:52145.80,2019:54099.99,2020:55628.60,
+  2021:60575.07,2022:63795.13,2023:66621.80
+};
+const AWI_GROWTH=0.038;
+function getAWI(year){
+  if(AWI_RAW[year])return AWI_RAW[year];
+  if(year>2023)return AWI_RAW[2023]*Math.pow(1+AWI_GROWTH,year-2023);
+  return AWI_RAW[1951];
+}
+const BEND_1977=[180,1085];
+function getBendPoints(birthYear){
+  const indexYear=birthYear+62;
+  const awiRatio=getAWI(indexYear-2)/AWI_RAW[1977];
+  return[Math.round(BEND_1977[0]*awiRatio),Math.round(BEND_1977[1]*awiRatio)];
+}
+function calcPIA(aime,birthYear){
+  const [b1,b2]=getBendPoints(birthYear);
+  let pia=0;
+  pia+=Math.min(aime,b1)*0.90;
+  if(aime>b1)pia+=Math.min(aime-b1,b2-b1)*0.32;
+  if(aime>b2)pia+=(aime-b2)*0.15;
+  return Math.round(pia*10)/10;
+}
+function getFRA(birthYear){
+  if(birthYear<=1937)return{years:65,months:0};
+  if(birthYear===1938)return{years:65,months:2};
+  if(birthYear===1939)return{years:65,months:4};
+  if(birthYear===1940)return{years:65,months:6};
+  if(birthYear===1941)return{years:65,months:8};
+  if(birthYear===1942)return{years:65,months:10};
+  if(birthYear<=1954)return{years:66,months:0};
+  if(birthYear===1955)return{years:66,months:2};
+  if(birthYear===1956)return{years:66,months:4};
+  if(birthYear===1957)return{years:66,months:6};
+  if(birthYear===1958)return{years:66,months:8};
+  if(birthYear===1959)return{years:66,months:10};
+  return{years:67,months:0};
+}
+function fraMonths(birthYear){const f=getFRA(birthYear);return f.years*12+f.months;}
+function fraStr(birthYear){const f=getFRA(birthYear);return f.months===0?`${f.years}`:`${f.years}+${f.months}mo`;}
+function claimingFactor(claimMonths,fraMos){
+  const diff=claimMonths-fraMos;
+  if(diff===0)return 1;
+  if(diff>0)return 1+(diff/12)*0.08;
+  const early=Math.abs(diff);
+  const first=Math.min(early,36);
+  const rest=Math.max(0,early-36);
+  return 1-(first*(5/9/100))-(rest*(5/12/100));
+}
+// NOTE: AIME uses S.ssCap (base year nominal) — NOT inflated.
+// SS wage base for payroll TAX in runScenario is inflated separately.
+function calcAIME(earningsHistory,birthYear){
+  const indexYear=birthYear+60;
+  // SSA rule: cap nominal earnings at that year's SS wage base, then index.
+  // We approximate each year's wage base by inflating S.ssCap (the NPV-ref-year base).
+  const inflRate=S.inflationRate/100;
+  const indexed=earningsHistory.map(({year,nominalEarnings})=>{
+    const yearCap=S.ssCap*Math.pow(1+inflRate,year-S.npvYear);
+    const capped=Math.min(nominalEarnings,yearCap);
+    if(year>=indexYear)return capped;
+    return capped*(getAWI(indexYear)/getAWI(year));
+  });
+  indexed.sort((a,b)=>b-a);
+  const top35=indexed.slice(0,35);
+  while(top35.length<35)top35.push(0);
+  return Math.round(top35.reduce((s,v)=>s+v,0)/420);
+}
+function buildEarningsHistory(sc){
+  const salSched=buildSalarySchedule(sc);
+  return ages().map(age=>({year:ageYear(age),nominalEarnings:salSched[age]}));
+}
+function calcSSProjection(sc){
+  if(!S.birthdate)return null;
+  const bd=new Date(S.birthdate);
+  const birthYear=bd.getFullYear();
+  const eh=buildEarningsHistory(sc);
+  const aime=calcAIME(eh,birthYear);
+  const pia=calcPIA(aime,birthYear);
+  const fraMos=fraMonths(birthYear);
+  const benefits={};
+  for(let claimAge=62;claimAge<=70;claimAge++){
+    benefits[claimAge]=Math.round(pia*claimingFactor(claimAge*12,fraMos)*10)/10;
+  }
+  return{aime,pia,benefits,birthYear,fra:getFRA(birthYear),earningsHistory:eh};
+}
+function ssNPVStream(monthlyBenefit,claimAge,upToAge,birthYear,cola){
+  const colaRate=cola/100;const inflRate=S.inflationRate/100;
+  let cumulative=0;const results={};
+  for(let age=62;age<=upToAge;age++){
+    if(age>=claimAge){
+      const yearsAfterClaim=age-claimAge;
+      const nomBenefit=monthlyBenefit*12*Math.pow(1+colaRate,yearsAfterClaim);
+      const yearsFromNPVRef=(birthYear+age)-S.npvYear;
+      const val=S.showNPV?nomBenefit/Math.pow(1+inflRate,yearsFromNPVRef):nomBenefit;
+      cumulative+=val;
+    }
+    results[age]=cumulative;
+  }
+  return results;
+}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function ages(){return Array.from({length:S.endAge-S.startAge+1},(_,i)=>i+S.startAge);}
+function ageYear(age){
+  if(!S.birthdate)return CUR_YEAR+(age-S.startAge);
+  const bd=new Date(S.birthdate);
+  const birthYear=bd.getFullYear(),birthMonth=bd.getMonth()+1;
+  const notYet=(S.startMonth||1)<birthMonth?1:0;
+  return birthYear+S.startAge+notYet+(age-S.startAge);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function displayFactor(age){
+  if(!S.showNPV)return 1;
+  const exp=ageYear(age)-S.npvYear;
+  if(exp===0)return 1;
+  return 1/Math.pow(1+S.inflationRate/100,exp);
+}
+function portfolioRate(){return S.marketReturn/100;}
+function inflFactor(){return 1;}
+function inputInflFactor(){return 1;}
+
+function goalNominal(g,age){
+  const exp=ageYear(age)-S.npvYear;
+  return exp<=0?g.amount:g.amount*Math.pow(1+S.inflationRate/100,exp);
+}
+function goalDisplay(g,age){return S.showNPV?g.amount:goalNominal(g,age);}
+function goalThreshold(g,age){return goalDisplay(g,age);}
+
+function fmt(n){if(n==null||isNaN(n))return'—';const abs=Math.abs(n),sign=n<0?'-':'';if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(1)+'M';if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(0)+'k';return sign+'$'+Math.round(abs);}
+function fmtFull(n){return n==null||isNaN(n)?'—':'$'+Math.round(n).toLocaleString();}
+function fmtPct(n){return(n*100).toFixed(1)+'%';}
+function axFmt(v){if(v>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'$'+(v/1e3).toFixed(0)+'k';return'$'+v;}
+function hexRgb(hex){return`${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;}
+function blendHex(hex,alpha){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  const br=0x1a,bg=0x1d,bb=0x27;
+  const or=Math.round(r*alpha+br*(1-alpha)),og=Math.round(g*alpha+bg*(1-alpha)),ob=Math.round(b*alpha+bb*(1-alpha));
+  return`rgb(${or},${og},${ob})`;
+}
+
+// ════════════════════════════════════════════
+// SALARY / SPENDING / SAVINGS SCHEDULES
+// ════════════════════════════════════════════
+function buildSalaryScheduleNPV(sc){
+  const ov=sc.salaryOverrides||{};let cur=sc.startSalary||0;const s={};
+  for(const age of ages()){if(ov[age]!=null)cur=ov[age];s[age]=cur;if(sc.growthType==='pct')cur*=(1+(sc.growthVal||0)/100);else if(sc.growthType==='fixed')cur+=(sc.growthVal||0);}
+  return s;
+}
+function buildSalarySchedule(sc){const npv=buildSalaryScheduleNPV(sc);const s={};for(const age of ages())s[age]=npv[age];return s;}
+function seededSalaryNPV(sc,age){const ov={...(sc.salaryOverrides||{})};delete ov[age];return buildSalaryScheduleNPV({...sc,salaryOverrides:ov})[age];}
+
+function buildSpendingScheduleNPV(sc){
+  const ov=sc.spendingOverrides||{};let cur=sc.defaultSpending||0;
+  const gType=sc.spendingGrowthType||'none',gVal=sc.spendingGrowthVal||0;const s={};
+  for(const age of ages()){if(ov[age]!=null)cur=ov[age];s[age]=cur;if(gType==='pct')cur*=(1+gVal/100);else if(gType==='fixed')cur+=gVal;}
+  return s;
+}
+function buildSpendingSchedule(sc){const npv=buildSpendingScheduleNPV(sc);const s={};for(const age of ages())s[age]=npv[age];return s;}
+function seededSpendingNPV(sc,age){const ov={...(sc.spendingOverrides||{})};delete ov[age];return buildSpendingScheduleNPV({...sc,spendingOverrides:ov})[age];}
+
+function getSavingsAndSpending(sc,age,net){
+  const mode=sc.controlMode||'spend';
+  if(mode==='spend'){
+    const spending=buildSpendingSchedule(sc)[age];
+    return{savings:net-spending,spending};
+  }
+  const ov=sc.savingsOverrides||{};
+  const ageIndex=ages().indexOf(age);
+  let grownDefault=sc.defaultSavingsVal??50;
+  const sgType=sc.savingsGrowthType||'none',sgVal=sc.savingsGrowthVal||0;
+  for(let i=0;i<ageIndex;i++){
+    const a=ages()[i];
+    if(ov[a]!=null)grownDefault=ov[a].val;
+    if(sgType==='pct')grownDefault*=(1+sgVal/100);
+    else if(sgType==='fixed')grownDefault+=sgVal;
+  }
+  const type=ov[age]?.type??sc.defaultSavingsType??'pct';
+  const val=ov[age]?.val??grownDefault;
+  const savings=type==='pct'?net*Math.min(val,100)/100:Math.min(val,net);
+  return{savings,spending:Math.max(0,net-savings)};
+}
+
+// ════════════════════════════════════════════
+// SCENARIO ENGINE
+// Key changes:
+//   - taxMul per age inflates all brackets + SS cap + $200k Medicare threshold
+//   - SS AIME still uses raw S.ssCap (not inflated) per user decision
+//   - savingsRate = totalSaved / (gross - allIncomeTaxes) — 401k NOT in denominator
+// ════════════════════════════════════════════
+function runScenario(sc){
+  const salSched=buildSalarySchedule(sc);
+  // Split tracking: starting balance goes entirely into brokerage
+  let port401k=0;
+  let portBrokerage=S.startBalance;
+  const rows=[];
+  for(const age of ages()){
+    const gross=salSched[age];
+    const tMul=taxMulForAge(age);
+    const inflatedSsCap=S.ssCap*tMul;
+    const medThreshold=200000*tMul;
+    const ssTax=Math.min(gross,inflatedSsCap)*(S.ss/100);
+    const medTax=gross*(S.medicare/100)+Math.max(0,gross-medThreshold)*(S.medicareAdd/100);
+    // 401k contribution & limit both inflate with tMul
+    const k401=Math.min(S.k401,S.k401limit)*tMul;
+    const fTax=calcFedTax(gross,S.filing,k401,tMul);
+    const sTax=calcStTax(gross,S.stateCode,tMul);
+    const net=gross-(ssTax+medTax+k401+fTax+sTax);
+    const{savings,spending}=getSavingsAndSpending(sc,age,net);
+    const totalSavings=savings+k401;
+    // Grow each bucket at market rate then deposit
+    port401k=port401k*(1+portfolioRate())+k401;
+    portBrokerage=portBrokerage*(1+portfolioRate())+savings;
+    const portfolio=port401k+portBrokerage;
+    const grossAfterTax=gross-(ssTax+medTax+fTax+sTax);
+    const savingsRate=grossAfterTax>0?totalSavings/grossAfterTax:0;
+    const df=displayFactor(age);
+    rows.push({age,year:ageYear(age),
+      gross:gross*df,ssTax:ssTax*df,medTax:medTax*df,k401:k401*df,
+      fTax:fTax*df,sTax:sTax*df,net:net*df,savings:savings*df,spending:spending*df,
+      grossAfterTax:grossAfterTax*df,
+      portfolio:portfolio*df,portfolioNominal:portfolio,
+      port401k:port401k*df,portBrokerage:portBrokerage*df,
+      savingsRate});
+  }
+  return rows;
+}
+
+// ════════════════════════════════════════════
+// CHARTS
+// ════════════════════════════════════════════
+let portChart=null,brkChart=null,splitChart=null,taxChart=null,ssBenChart=null,ssBreakChart=null,ssWhatChart=null;
+
+function getSliderAges(){
+  const AGES=ages();
+  const fi=parseInt(document.getElementById('slider-from').value)||0;
+  const ti=parseInt(document.getElementById('slider-to').value)||AGES.length-1;
+  return{from:AGES[Math.min(fi,AGES.length-1)]||AGES[0],to:AGES[Math.min(ti,AGES.length-1)]||AGES[AGES.length-1]};
+}
+
+function renderPortfolioChart(){
+  const modeStr=S.showNPV?`NPV (ref ${S.npvYear})`:'Future Nominal';
+  document.getElementById('port-chart-title').textContent=`Portfolio Balance — ${modeStr}`;
+  const AGES=ages();const allRows=S.scenarios.map(sc=>runScenario(sc));
+  const{from,to}=getSliderAges();const viewAges=AGES.filter(a=>a>=from&&a<=to);
+  const labels=viewAges.map(a=>`Age ${a}`);const datasets=[];
+  S.goals.forEach((g,gi)=>{datasets.push({label:g.label||`Goal ${fmt(g.amount)}`,data:viewAges.map(a=>goalDisplay(g,a)),borderColor:COLORS[(gi+4)%COLORS.length],borderDash:[3,5],borderWidth:1.5,pointRadius:0,fill:false,tension:0,order:90+gi});});
+  S.scenarios.forEach((sc,si)=>{
+    const rows=allRows[si];const rowMap={};rows.forEach(r=>rowMap[r.age]=r);
+    datasets.push({label:sc.name,data:viewAges.map(a=>rowMap[a]?.portfolio??null),borderColor:COLORS[si%COLORS.length],borderWidth:2.5,pointRadius:0,pointHoverRadius:5,fill:false,tension:0.25,order:si});
+  });
+  const annotations={};
+  S.milestones.forEach((mAge,mi)=>{if(mAge<from||mAge>to)return;const vi=viewAges.indexOf(mAge);if(vi<0)return;
+    annotations[`ml${mi}`]={type:'line',scaleID:'x',value:vi,borderColor:'rgba(240,201,74,0.4)',borderWidth:1,borderDash:[3,4],label:{content:`${mAge}`,display:true,position:'start',backgroundColor:'rgba(240,201,74,0.1)',color:'#f0c94a',font:{size:9},padding:{x:3,y:2}}};
+  });
+  S.scenarios.forEach((sc,si)=>{
+    S.goals.forEach((g,gi)=>{
+      const rows=allRows[si];const hit=rows.find(r=>r.age>=from&&r.age<=to&&r.portfolio>=goalThreshold(g,r.age));
+      if(!hit)return;const vi=viewAges.indexOf(hit.age);if(vi<0)return;
+      annotations[`g${si}_${gi}`]={type:'point',xValue:vi,yValue:hit.portfolio,backgroundColor:COLORS[si%COLORS.length],borderColor:'#fff',borderWidth:2,radius:6,label:{content:`🎯 ${sc.name}`,display:true,position:'top',backgroundColor:'rgba(15,17,23,0.85)',color:COLORS[si%COLORS.length],font:{size:9,weight:'bold'},padding:{x:4,y:2},borderRadius:3}};
+    });
+  });
+  const ctx=document.getElementById('chart-portfolio').getContext('2d');
+  if(portChart)portChart.destroy();
+  portChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3b8',boxWidth:10,font:{size:11},padding:8}},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`}},annotation:{annotations}},scales:{x:{ticks:{color:'#636a88',maxTicksLimit:14,font:{size:10}},grid:{color:'#1a1f2e'}},y:{ticks:{color:'#636a88',font:{size:10},callback:v=>axFmt(v)},grid:{color:'#1a1f2e'}}}}});
+}
+
+// ── Breakdown chart — sectioned tooltip ────────────────────────────────────
+function renderBreakdownChart(){
+  const sel=document.getElementById('bar-sc-sel');
+  const domIdx=parseInt(sel.value)||0;
+  if(sel.options.length>0)S.lastBreakdownSc=domIdx;
+  const prev=S.lastBreakdownSc;
+  sel.innerHTML='';
+  if(!S.scenarios.length){if(brkChart){brkChart.destroy();brkChart=null;}return;}
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;sel.appendChild(o);});
+  const validIdx=Math.min(prev,S.scenarios.length-1);sel.value=validIdx;S.lastBreakdownSc=validIdx;
+  const sc=S.scenarios[validIdx];if(!sc)return;
+  const rows=runScenario(sc);
+  const modeStr=S.showNPV?`NPV (ref ${S.npvYear})`:'Future Nominal';
+  document.getElementById('bar-chart-title').textContent=`Annual Breakdown & Savings Rate — ${modeStr}`;
+  const ctx=document.getElementById('chart-breakdown').getContext('2d');
+  if(brkChart)brkChart.destroy();
+  brkChart=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>`${r.age}`),datasets:[
+    {type:'bar',label:'SS+Medicare', data:rows.map(r=>r.ssTax+r.medTax),backgroundColor:'#e85b5b55',stack:'s',yAxisID:'y'},
+    {type:'bar',label:'Federal Tax',  data:rows.map(r=>r.fTax),          backgroundColor:'#ee875b55',stack:'s',yAxisID:'y'},
+    {type:'bar',label:'State Tax',    data:rows.map(r=>r.sTax),           backgroundColor:'#f0c94a44',stack:'s',yAxisID:'y'},
+    {type:'bar',label:'401k',         data:rows.map(r=>r.k401),           backgroundColor:'#5bd4ee55',stack:'s',yAxisID:'y'},
+    {type:'bar',label:'Spending',     data:rows.map(r=>r.spending),        backgroundColor:'#7c5bde77',stack:'s',yAxisID:'y'},
+    {type:'bar',label:'Savings',      data:rows.map(r=>r.savings),         backgroundColor:'#34c98e77',stack:'s',yAxisID:'y'},
+    {type:'line',label:'Savings Rate %',data:rows.map(r=>+(r.savingsRate*100).toFixed(1)),borderColor:'#fff',borderWidth:2,pointRadius:0,fill:false,tension:0.35,yAxisID:'y2',order:-1}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{labels:{color:'#9ca3b8',boxWidth:9,font:{size:11},padding:7}},
+      tooltip:{
+        backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,
+        titleColor:'#e8eaf0',bodyColor:'#9ca3b8',
+        titleFont:{size:12,weight:'bold'},bodyFont:{size:11},
+        padding:12,
+        callbacks:{
+          title:(items)=>{
+            const r=rows[items[0].dataIndex];
+            return `Age ${r.age}  ·  ${r.year}`;
+          },
+          label:()=>null,  // suppress per-dataset lines; afterBody handles everything
+          afterBody:(items)=>{
+            if(!items.length)return[];
+            const r=rows[items[0].dataIndex];
+            const totalTax=r.ssTax+r.medTax+r.fTax+r.sTax;
+            const effRate=r.gross>0?totalTax/r.gross:0;
+            const takeHome=r.gross-totalTax-r.k401; // cash to bank account
+            const totalSaved=r.savings+r.k401;
+            const w=(label,val)=>`  ${label.padEnd(16)}${val}`;
+            return[
+              '▸ INCOME',
+              w('Gross',fmt(r.gross)),
+              w('After-Tax',fmt(r.grossAfterTax)),
+              w('Take-Home',fmt(takeHome)),
+              '',
+              '▸ TAXES',
+              w('Federal',fmt(r.fTax)),
+              w('State',fmt(r.sTax)),
+              w('SS + Medicare',fmt(r.ssTax+r.medTax)),
+              w('Total Tax',fmt(totalTax)),
+              w('Effective Rate',(effRate*100).toFixed(1)+'%'),
+              '',
+              '▸ CASHFLOW',
+              w('Spending',fmt(r.spending)),
+              w('Cash Saved',fmt(r.savings)),
+              w('401k',fmt(r.k401)),
+              w('Total Saved',fmt(totalSaved)),
+              w('Savings Rate',(r.savingsRate*100).toFixed(1)+'%'),
+            ];
+          }
+        }
+      }
+    },
+    scales:{
+      x:{stacked:true,ticks:{color:'#636a88',font:{size:9},maxTicksLimit:22},grid:{color:'#1a1f2e'}},
+      y:{stacked:true,ticks:{color:'#636a88',font:{size:10},callback:v=>axFmt(v)},grid:{color:'#1a1f2e'},position:'left'},
+      y2:{type:'linear',position:'right',ticks:{color:'#9ca3b8',font:{size:10},callback:v=>v+'%'},grid:{drawOnChartArea:false},min:0,max:100}
+    }
+  }});
+  renderPortfolioSplitChart(rows);
+}
+
+// ════════════════════════════════════════════
+// PORTFOLIO SPLIT CHART
+// ════════════════════════════════════════════
+function renderPortfolioSplitChart(rows){
+  const modeStr=S.showNPV?`NPV (ref ${S.npvYear})`:'Future Nominal';
+  document.getElementById('split-chart-title').textContent=`Portfolio Split — 401k vs Brokerage/Cash — ${modeStr}`;
+  const ctx=document.getElementById('chart-split').getContext('2d');
+  if(splitChart)splitChart.destroy();
+  splitChart=new Chart(ctx,{type:'line',data:{labels:rows.map(r=>`${r.age}`),datasets:[
+    {label:'401k',data:rows.map(r=>r.port401k),backgroundColor:'rgba(91,212,238,0.35)',borderColor:'#5bd4ee',borderWidth:2,pointRadius:0,fill:true,tension:0.3},
+    {label:'Brokerage / Cash',data:rows.map(r=>r.portBrokerage),backgroundColor:'rgba(52,201,142,0.25)',borderColor:'#34c98e',borderWidth:2,pointRadius:0,fill:true,tension:0.3}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{labels:{color:'#9ca3b8',boxWidth:10,font:{size:11},padding:8}},
+      tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',
+        titleFont:{size:12,weight:'bold'},bodyFont:{size:11},padding:12,
+        callbacks:{
+          title:(items)=>{const r=rows[items[0].dataIndex];return `Age ${r.age}  ·  ${r.year}`;},
+          label:()=>null,
+          afterBody:(items)=>{
+            if(!items.length)return[];
+            const r=rows[items[0].dataIndex];
+            const total=r.port401k+r.portBrokerage;
+            const pct401k=total>0?(r.port401k/total*100).toFixed(1):'0.0';
+            const pctBrk=total>0?(r.portBrokerage/total*100).toFixed(1):'0.0';
+            const w=(label,val)=>`  ${label.padEnd(18)}${val}`;
+            return[
+              w('401k',fmt(r.port401k)+` (${pct401k}%)`),
+              w('Brokerage/Cash',fmt(r.portBrokerage)+` (${pctBrk}%)`),
+              '',
+              w('Total',fmt(total)),
+            ];
+          }
+        }
+      }
+    },
+    scales:{
+      x:{ticks:{color:'#636a88',font:{size:9},maxTicksLimit:22},grid:{color:'#1a1f2e'}},
+      y:{ticks:{color:'#636a88',font:{size:10},callback:v=>axFmt(v)},grid:{color:'#1a1f2e'},stacked:false}
+    }
+  }});
+}
+
+// ════════════════════════════════════════════
+// TAX CHART
+// ════════════════════════════════════════════
+function renderTaxChart(){
+  const sel=document.getElementById('tax-sc-sel');
+  const domIdx=parseInt(sel.value)||0;
+  if(sel.options.length>0)S.lastTaxSc=domIdx;
+  sel.innerHTML='';
+  if(!S.scenarios.length){if(taxChart){taxChart.destroy();taxChart=null;}return;}
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;sel.appendChild(o);});
+  const validIdx=Math.min(S.lastTaxSc,S.scenarios.length-1);sel.value=validIdx;S.lastTaxSc=validIdx;
+  const sc=S.scenarios[validIdx];if(!sc)return;
+  const rows=runScenario(sc);
+  const ctx=document.getElementById('chart-tax').getContext('2d');
+  if(taxChart)taxChart.destroy();
+  taxChart=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>`${r.age}`),datasets:[
+    {label:'SS (Employee)',data:rows.map(r=>r.ssTax),backgroundColor:'#e85b5b88',stack:'s'},
+    {label:'Medicare',    data:rows.map(r=>r.medTax),backgroundColor:'#ee875b88',stack:'s'},
+    {label:'Federal Tax', data:rows.map(r=>r.fTax),  backgroundColor:'#7c5bde88',stack:'s'},
+    {label:'State Tax',   data:rows.map(r=>r.sTax),  backgroundColor:'#f0c94a88',stack:'s'},
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3b8',boxWidth:9,font:{size:11}}},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`,afterBody:(items)=>{const gross=rows[items[0].dataIndex].gross;const totalTax=items.reduce((s,i)=>s+i.raw,0);return[`Effective: ${(totalTax/gross*100).toFixed(1)}%`];}}}},scales:{x:{stacked:true,ticks:{color:'#636a88',font:{size:9},maxTicksLimit:22},grid:{color:'#1a1f2e'}},y:{stacked:true,ticks:{color:'#636a88',font:{size:10},callback:v=>axFmt(v)},grid:{color:'#1a1f2e'}}}}});
+}
+
+// ════════════════════════════════════════════
+// TAX CALCULATOR — now with year input & inflation-indexed brackets
+// ════════════════════════════════════════════
+function runTaxCalc(){
+  const gross=ciVal('calc-salary');
+  const filing=document.getElementById('calc-filing').value;
+  const state=document.getElementById('calc-state').value;
+  // Tax Calculator always uses 2026 brackets as-is (mul=1)
+  const tMul=1;
+  const inflatedSsCap=S.ssCap;
+  const medThreshold=200000;
+
+  const fedDetail=fedBracketDetail(gross,filing,0,tMul);
+  const stDetail=stBracketDetail(gross,state,tMul);
+  const stStd=(state!=='none'&&ST[state]&&ST[state].std)?ST[state].std:0;
+  const stTaxable=state!=='none'&&ST[state]&&ST[state].type==='p'?Math.max(0,gross-stStd):gross;
+  const ssTax=Math.min(gross,inflatedSsCap)*0.062;
+  const medTax=gross*0.0145+Math.max(0,gross-medThreshold)*0.009;
+  const totalTax=fedDetail.totalTax+stDetail.totalTax+ssTax+medTax;
+  const fedEffRate=gross>0?fedDetail.totalTax/gross:0;
+  const stEffRate=gross>0?stDetail.totalTax/gross:0;
+  const totalEffRate=gross>0?totalTax/gross:0;
+  const margFed=fedDetail.rows.length>0?fedDetail.rows[fedDetail.rows.length-1].rate:0;
+  const stName=state!=='none'&&ST[state]?ST[state].name:'';
+  const fedStd=FED[filing].std*tMul;
+
+  // Year label on bracket section
+  document.getElementById('tax-calc-results').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Gross</span><strong>${fmtFull(gross)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Fed. Std. Deduction (2026)</span><span style="color:var(--text3)">− ${fmtFull(fedStd)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Federal Taxable Income</span><span>${fmtFull(Math.max(0,gross-fedStd))}</span></div>
+      ${stStd>0?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">State Std. Deduction (${stName})</span><span style="color:var(--text3)">− ${fmtFull(stStd)}</span></div><div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">State Taxable Income</span><span>${fmtFull(stTaxable)}</span></div>`:''}
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Federal Income Tax</span><span>${fmtFull(fedDetail.totalTax)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">State Tax${stName?' ('+stName+')':''}</span><span>${fmtFull(stDetail.totalTax)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">SS (6.2%, cap ${fmtFull(inflatedSsCap)})</span><span>${fmtFull(ssTax)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Medicare (threshold ${fmtFull(medThreshold)})</span><span>${fmtFull(medTax)}</span></div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Total Tax</span><strong>${fmtFull(totalTax)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Take-Home</span><strong style="color:var(--green)">${fmtFull(gross-totalTax)}</strong></div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Federal Effective Rate</span><strong>${fmtPct(fedEffRate)}</strong></div>
+      ${state!=='none'?`<div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">State Effective Rate</span><strong>${fmtPct(stEffRate)}</strong></div>`:''}
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Total Effective Rate</span><strong style="color:var(--yellow)">${fmtPct(totalEffRate)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Marginal Federal</span><strong>${fmtPct(margFed)}</strong></div>
+    </div>`;
+
+  let fbHtml='<div class="tax-bkt-row hdr"><span>Bracket</span><span>Range</span><span style="text-align:right">Taxed</span><span style="text-align:right">Rate</span><span style="text-align:right">Tax</span></div>';
+  fedDetail.rows.forEach(bkt=>{const lo=bkt.low,hi=bkt.high===Infinity?'∞':`$${Math.round(bkt.high).toLocaleString()}`;fbHtml+=`<div class="tax-bkt-row"><span>${(bkt.rate*100).toFixed(0)}%</span><span>$${Math.round(lo).toLocaleString()}–${hi}</span><span style="text-align:right">${fmtFull(bkt.taxed)}</span><span style="text-align:right">${(bkt.rate*100).toFixed(1)}%</span><span style="text-align:right">${fmtFull(bkt.tax)}</span></div>`;});
+  document.getElementById('calc-fed-brackets').innerHTML=fbHtml;
+
+  let sbHtml='';
+  if(stDetail.type==='none'){sbHtml='<p class="note">No state income tax</p>';}
+  else if(stDetail.type==='flat'){sbHtml=`<p class="note" style="margin-bottom:6px">Flat rate — no bracket inflation applied</p><div class="tax-bkt-row hdr"><span>Type</span><span>Applied to</span><span style="text-align:right">Taxed</span><span style="text-align:right">Rate</span><span style="text-align:right">Tax</span></div><div class="tax-bkt-row"><span>Flat</span><span>Gross income</span><span style="text-align:right">${fmtFull(gross)}</span><span style="text-align:right">${(stDetail.rows[0].rate*100).toFixed(2)}%</span><span style="text-align:right">${fmtFull(stDetail.totalTax)}</span></div>`;}
+  else{
+    if(stStd>0)sbHtml+=`<p class="note" style="margin-bottom:6px">Std deduction: ${fmtFull(stStd)} → Taxable: ${fmtFull(stTaxable)}</p>`;
+    sbHtml+='<div class="tax-bkt-row hdr"><span>Bracket</span><span>Range</span><span style="text-align:right">Taxed</span><span style="text-align:right">Rate</span><span style="text-align:right">Tax</span></div>';
+    stDetail.rows.forEach(bkt=>{const lo=bkt.low,hi=bkt.high===Infinity?'∞':`$${Math.round(bkt.high).toLocaleString()}`;sbHtml+=`<div class="tax-bkt-row"><span>${(bkt.rate*100).toFixed(2)}%</span><span>$${Math.round(lo).toLocaleString()}–${hi}</span><span style="text-align:right">${fmtFull(bkt.taxed)}</span><span style="text-align:right">${(bkt.rate*100).toFixed(2)}%</span><span style="text-align:right">${fmtFull(bkt.tax)}</span></div>`;});
+  }
+  document.getElementById('calc-state-brackets').innerHTML=sbHtml;
+}
+
+// ════════════════════════════════════════════
+// SOCIAL SECURITY RENDERING
+// ════════════════════════════════════════════
+function syncSSScSel(forceIdx){
+  const sel=document.getElementById('ss-sc-sel');
+  const target=forceIdx!=null?forceIdx:S.lastSSSc;
+  sel.innerHTML='';
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;sel.appendChild(o);});
+  const v=Math.min(target,Math.max(0,S.scenarios.length-1));
+  sel.value=v;S.lastSSSc=v;
+}
+function renderSSAll(){
+  if(!S.scenarios.length||!S.birthdate)return;
+  const sel=document.getElementById('ss-sc-sel');
+  const domIdx=sel.options.length>0?parseInt(sel.value)||0:S.lastSSSc;
+  syncSSScSel(domIdx);
+  const sc=S.scenarios[S.lastSSSc];if(!sc)return;
+  const proj=calcSSProjection(sc);if(!proj)return;
+  const cola=parseFloat(document.getElementById('ss-cola').value)||2.6;
+  renderSSProj(proj,cola);renderSSBreakeven(proj,cola);renderSSWhatIf(proj,cola,sc);
+}
+
+// Deflate a nominal monthly SS benefit to NPV if toggle is on.
+// Discounts from the calendar year of first payment (birthYear+claimAge) to npvYear.
+function ssBenefitDisplay(nomBenefit,claimAge,birthYear){
+  if(!S.showNPV)return nomBenefit;
+  const claimYear=birthYear+claimAge;
+  const df=1/Math.pow(1+S.inflationRate/100,claimYear-S.npvYear);
+  return nomBenefit*df;
+}
+
+function renderSSProj(proj,cola){
+  const{aime,pia,benefits,birthYear,fra,earningsHistory}=proj;
+  const fra_pia=benefits[fra.years]||pia;
+  const modeStr=S.showNPV?`NPV (ref ${S.npvYear})`:'Nominal';
+  const bd=(claimAge)=>ssBenefitDisplay(benefits[claimAge],claimAge,birthYear);
+  const bdFRA=ssBenefitDisplay(fra_pia,fra.years,birthYear);
+  document.getElementById('ss-stats').innerHTML=`
+    <div class="ss-stat"><div class="ss-stat-lbl">AIME</div><div class="ss-stat-val">${fmtFull(aime)}<span style="font-size:12px;color:var(--text3)">/mo</span></div><div class="ss-stat-sub">Avg Indexed Monthly Earnings</div></div>
+    <div class="ss-stat"><div class="ss-stat-lbl">PIA</div><div class="ss-stat-val">${fmtFull(pia)}<span style="font-size:12px;color:var(--text3)">/mo</span></div><div class="ss-stat-sub">Primary Insurance Amount (nominal)</div></div>
+    <div class="ss-stat"><div class="ss-stat-lbl">FRA</div><div class="ss-stat-val">Age ${fraStr(birthYear)}</div><div class="ss-stat-sub">Full Retirement Age</div></div>
+    <div class="ss-stat"><div class="ss-stat-lbl">Benefit @ FRA <span style="font-size:9px;color:var(--text3)">${modeStr}</span></div><div class="ss-stat-val">${fmtFull(bdFRA)}<span style="font-size:12px;color:var(--text3)">/mo</span></div><div class="ss-stat-sub">Before COLA adjustments</div></div>
+    <div class="ss-stat"><div class="ss-stat-lbl">Benefit @ 62 <span style="font-size:9px;color:var(--text3)">${modeStr}</span></div><div class="ss-stat-val" style="color:var(--red)">${fmtFull(bd(62))}<span style="font-size:12px;color:var(--text3)">/mo</span></div><div class="ss-stat-sub">Earliest claim age</div></div>
+    <div class="ss-stat"><div class="ss-stat-lbl">Benefit @ 70 <span style="font-size:9px;color:var(--text3)">${modeStr}</span></div><div class="ss-stat-val" style="color:var(--green)">${fmtFull(bd(70))}<span style="font-size:12px;color:var(--text3)">/mo</span></div><div class="ss-stat-sub">Maximum delayed claim</div></div>`;
+  const claimAges=Array.from({length:9},(_,i)=>62+i);
+  const ctx=document.getElementById('chart-ss-benefit').getContext('2d');
+  if(ssBenChart)ssBenChart.destroy();
+  const barLabel=S.showNPV?`Monthly Benefit (NPV ${S.npvYear})`:'Monthly Benefit (Nominal)';
+  ssBenChart=new Chart(ctx,{type:'bar',data:{labels:claimAges.map(a=>`Age ${a}`),datasets:[{label:barLabel,data:claimAges.map(a=>ssBenefitDisplay(benefits[a],a,birthYear)),backgroundColor:claimAges.map(a=>a<fra.years?'#e85b5b88':a===fra.years?'#f0c94a88':'#34c98e88'),borderColor:claimAges.map(a=>a<fra.years?'#e85b5b':a===fra.years?'#f0c94a':'#34c98e'),borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',callbacks:{label:c=>`${fmtFull(c.raw)}/month (${modeStr})`}}},scales:{x:{ticks:{color:'#636a88',font:{size:10}},grid:{color:'#1a1f2e'}},y:{ticks:{color:'#636a88',font:{size:10},callback:v=>fmtFull(v)},grid:{color:'#1a1f2e'}}}}});
+  const thead=document.querySelector('#ss-aime-table thead');
+  const tbody=document.querySelector('#ss-aime-table tbody');
+  const indexYear=birthYear+60;
+  const inflRate=S.inflationRate/100;
+  const withIndex=earningsHistory.map(e=>{
+    const yearCap=S.ssCap*Math.pow(1+inflRate,e.year-S.npvYear);
+    const capped=Math.min(e.nominalEarnings,yearCap);
+    const factor=e.year>=indexYear?1:getAWI(indexYear)/getAWI(e.year);
+    return{...e,factor,indexed:capped*factor,cappedNom:capped};
+  });
+  const sorted=[...withIndex].sort((a,b)=>b.indexed-a.indexed);
+  const top35Set=new Set(sorted.slice(0,35).map(e=>e.year));
+  let tbHtml='';
+  withIndex.forEach(e=>{const isTop=top35Set.has(e.year);tbHtml+=`<tr style="${isTop?'':'opacity:0.5'}"><td>${e.year-birthYear}</td><td>${e.year}</td><td style="text-align:right">${fmtFull(e.nominalEarnings)}</td><td style="text-align:right">${fmtFull(e.cappedNom)}</td><td style="text-align:right">${e.factor.toFixed(3)}</td><td style="text-align:right">${fmtFull(e.indexed)}</td><td style="text-align:right;color:${isTop?'var(--green)':'var(--text3)'}">${isTop?'✓ Top 35':'—'}</td></tr>`;});
+  thead.innerHTML='<tr><th>Age</th><th>Year</th><th style="text-align:right">Nominal Earnings</th><th style="text-align:right">Capped Nominal</th><th style="text-align:right">AWI Factor</th><th style="text-align:right">Indexed</th><th style="text-align:right">Top 35?</th></tr>';
+  tbody.innerHTML=tbHtml;
+}
+
+function renderSSBreakeven(proj,cola){
+  const{benefits,birthYear}=proj;
+  const claimAges=[62,63,64,65,66,67,68,69,70];
+  const ageRange=Array.from({length:34},(_,i)=>62+i);
+  const modeStr=S.showNPV?`Cumulative NPV (ref ${S.npvYear})`:'Cumulative Nominal';
+  const ctx=document.getElementById('chart-ss-breakeven').getContext('2d');
+  if(ssBreakChart)ssBreakChart.destroy();
+  const datasets=claimAges.map((ca,i)=>{const stream=ssNPVStream(benefits[ca],ca,95,birthYear,cola);return{label:`Claim @ ${ca}`,data:ageRange.map(a=>stream[a]||0),borderColor:COLORS[i%COLORS.length],borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:false,tension:0.1};});
+  ssBreakChart=new Chart(ctx,{type:'line',data:{labels:ageRange.map(a=>`${a}`),datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3b8',boxWidth:10,font:{size:10},padding:6}},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',callbacks:{title:i=>`Age ${i[0].label} — ${modeStr}`,label:c=>` Claim @${c.dataset.label.split('@')[1]}: ${fmtFull(c.raw)}`}}},scales:{x:{ticks:{color:'#636a88',font:{size:9},maxTicksLimit:18},grid:{color:'#1a1f2e'}},y:{ticks:{color:'#636a88',font:{size:10},callback:v=>axFmt(v)},grid:{color:'#1a1f2e'}}}}});
+  let beHtml=`<div style="overflow-x:auto"><table class="sum-t"><thead><tr><th>Earlier Claim</th><th>Later Claim</th><th>Breakeven Age</th><th>Earlier Monthly (${S.showNPV?'NPV':'Nominal'})</th><th>Later Monthly (${S.showNPV?'NPV':'Nominal'})</th><th>Monthly Diff</th></tr></thead><tbody>`;
+  [[62,67],[62,70],[64,67],[64,70],[66,70],[67,70]].forEach(([early,late])=>{
+    const eStream=ssNPVStream(benefits[early],early,95,birthYear,cola);
+    const lStream=ssNPVStream(benefits[late],late,95,birthYear,cola);
+    let beAge='Never';
+    for(const a of ageRange){if((lStream[a]||0)>=(eStream[a]||0)){beAge=`Age ${a}`;break;}}
+    const eBen=ssBenefitDisplay(benefits[early],early,birthYear);
+    const lBen=ssBenefitDisplay(benefits[late],late,birthYear);
+    beHtml+=`<tr><td>Age ${early}</td><td>Age ${late}</td><td style="font-weight:700;color:var(--yellow)">${beAge}</td><td style="color:var(--red)">${fmtFull(eBen)}/mo</td><td style="color:var(--green)">${fmtFull(lBen)}/mo</td><td>${fmtFull(lBen-eBen)}/mo</td></tr>`;
+  });
+  beHtml+='</tbody></table></div>';
+  document.getElementById('ss-breakeven-table').innerHTML=beHtml;
+}
+
+function renderSSWhatIf(proj,cola,sc){
+  const{benefits:baseBenefits,birthYear}=proj;
+  const salSched=buildSalarySchedule(sc);
+  const AGES=ages();const lastAge=AGES[AGES.length-1];const lastSalary=salSched[lastAge]||0;
+  const modeStr=S.showNPV?`NPV (ref ${S.npvYear})`:'Nominal';
+  function calcWhatIfProj(workToAge){
+    const baseEH=buildEarningsHistory(sc);const extraEH=[];
+    for(let age=lastAge+1;age<=workToAge;age++)extraEH.push({year:ageYear(age)||(birthYear+age),nominalEarnings:lastSalary});
+    const combinedEH=[...baseEH,...extraEH];
+    const newAIME=calcAIME(combinedEH,birthYear);const newPIA=calcPIA(newAIME,birthYear);
+    const fraMos=fraMonths(birthYear);const benefits={};
+    for(let ca=62;ca<=70;ca++){benefits[ca]=Math.round(newPIA*claimingFactor(ca*12,fraMos)*10)/10;}
+    return{aime:newAIME,pia:newPIA,benefits};
+  }
+  const wi62=lastAge>=62?null:calcWhatIfProj(62);
+  const wi67=lastAge>=67?null:calcWhatIfProj(67);
+  const claimAges=Array.from({length:9},(_,i)=>62+i);
+  // Apply display factor to each scenario's benefits for the chart
+  const displayBenefits=(bmap)=>claimAges.map(a=>ssBenefitDisplay(bmap[a],a,birthYear));
+  const datasets=[{label:`Current (stop @ ${lastAge})`,data:displayBenefits(baseBenefits),backgroundColor:'#5b8dee88',borderColor:'#5b8dee',borderWidth:1,type:'bar'}];
+  if(wi62)datasets.push({label:'Work to 62',data:displayBenefits(wi62.benefits),backgroundColor:'#34c98e55',borderColor:'#34c98e',borderWidth:1,type:'bar'});
+  if(wi67)datasets.push({label:'Work to 67',data:displayBenefits(wi67.benefits),backgroundColor:'#f0c94a55',borderColor:'#f0c94a',borderWidth:1,type:'bar'});
+  const ctx=document.getElementById('chart-ss-whatif').getContext('2d');
+  if(ssWhatChart)ssWhatChart.destroy();
+  ssWhatChart=new Chart(ctx,{type:'bar',data:{labels:claimAges.map(a=>`Age ${a}`),datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3b8',boxWidth:10,font:{size:11}}},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2e3349',borderWidth:1,titleColor:'#e8eaf0',bodyColor:'#9ca3b8',callbacks:{label:c=>`${fmtFull(c.raw)}/month (${modeStr})`}}},scales:{x:{ticks:{color:'#636a88',font:{size:10}},grid:{color:'#1a1f2e'}},y:{ticks:{color:'#636a88',font:{size:10},callback:v=>fmtFull(v)},grid:{color:'#1a1f2e'}}}}});
+  const fra=getFRA(birthYear);
+  const baseAtFRA=ssBenefitDisplay(baseBenefits[fra.years]||baseBenefits[67],fra.years,birthYear);
+  const scenarios_wi=[{label:`Stop @ Age ${lastAge} (current)`,d:proj},wi62?{label:'Work to Age 62',d:{...wi62,benefits:wi62.benefits}}:null,wi67?{label:'Work to Age 67',d:{...wi67,benefits:wi67.benefits}}:null].filter(Boolean);
+  let tHtml=`<div style="overflow-x:auto"><table class="sum-t"><thead><tr><th>Scenario</th><th>AIME</th><th>PIA (nominal)</th><th>Claim@62 (${modeStr})</th><th>Claim@FRA (${modeStr})</th><th>Claim@70 (${modeStr})</th><th>Gain @FRA</th></tr></thead><tbody>`;
+  scenarios_wi.forEach(({label,d})=>{
+    const fraB=ssBenefitDisplay(d.benefits[fra.years]||d.benefits[67],fra.years,birthYear);
+    const gain=fraB-baseAtFRA;
+    tHtml+=`<tr><td style="font-weight:600">${label}</td><td>${fmtFull(d.aime)}/mo</td><td>${fmtFull(d.pia)}/mo</td><td style="color:var(--red)">${fmtFull(ssBenefitDisplay(d.benefits[62],62,birthYear))}/mo</td><td style="font-weight:700">${fmtFull(fraB)}/mo</td><td style="color:var(--green)">${fmtFull(ssBenefitDisplay(d.benefits[70],70,birthYear))}/mo</td><td style="${gain>0?'color:var(--green)':gain<0?'color:var(--red)':''}">${gain>=0?'+':''}${fmtFull(gain)}/mo</td></tr>`;
+  });
+  tHtml+='</tbody></table></div>';
+  document.getElementById('ss-whatif-table').innerHTML=tHtml;
+}
+
+// ════════════════════════════════════════════
+// FIRE SUMMARY & PROJECTION
+// ════════════════════════════════════════════
+function renderSummary(){
+  const modeStr=S.showNPV?`📊 NPV (ref ${S.npvYear})`:'💵 Future Nominal';
+  document.getElementById('summary-badge').textContent=modeStr;
+  document.getElementById('milestone-badge').textContent=modeStr;
+  const AGES=ages();const allRows=S.scenarios.map(sc=>runScenario(sc));
+  const miles=S.milestones.filter(m=>AGES.includes(m));
+  const _gN=S.goals.length||1;
+  const _gColPct=Math.floor(67/_gN);
+  let gh=`<tr><th style="width:20%">Scenario</th><th style="width:13%">Mode</th>`;
+  S.goals.forEach(g=>{gh+=`<th style="width:${_gColPct}%">🎯 ${esc(g.label||fmt(g.amount))} NPV</th>`;});
+  if(!S.goals.length)gh+='<th style="width:67%;color:var(--text3)">No goals set</th>';
+  gh+='</tr>';
+  let gb='';
+  if(!S.scenarios.length)gb=`<tr><td colspan="20" style="text-align:center;color:var(--text3);padding:16px">Add scenarios</td></tr>`;
+  else S.scenarios.forEach((sc,si)=>{
+    const rows=allRows[si];const mode=sc.controlMode||'spend';
+    gb+=`<tr><td><div class="sc-name-cell"><span class="pill" style="background:${COLORS[si%COLORS.length]}"></span>${esc(sc.name)}</div></td><td style="color:var(--text2);font-size:10px">${mode==='spend'?'🛒 Spend-driven':'💰 Save-driven'}</td>`;
+    S.goals.forEach(g=>{const hit=rows.find(r=>r.portfolio>=goalThreshold(g,r.age));gb+=`<td>${hit?`<span class="gbadge">Age ${hit.age}</span><br><span style="font-size:10px;color:var(--text3)">${fmt(hit.portfolio)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>`;});
+    if(!S.goals.length)gb+=`<td style="color:var(--text3)">Add goals →</td>`;
+    gb+='</tr>';
+  });
+  document.querySelector('#goal-table tbody').innerHTML=gh+gb;
+  const _mColPct=miles.length>0?Math.floor(80/miles.length):80;
+  let mh=`<tr><th style="width:20%">Scenario</th>`;
+  miles.forEach(m=>{mh+=`<th style="width:${_mColPct}%">Age ${m}<br><span style="font-size:9px;font-weight:400;color:var(--text3)">${ageYear(m)}</span></th>`;});
+  mh+='</tr>';
+  let mb='';
+  if(!S.scenarios.length)mb=`<tr><td colspan="20" style="text-align:center;color:var(--text3);padding:16px">Add scenarios</td></tr>`;
+  else S.scenarios.forEach((sc,si)=>{
+    const rows=allRows[si];const rowMap={};rows.forEach(r=>rowMap[r.age]=r);
+    mb+=`<tr><td><div class="sc-name-cell"><span class="pill" style="background:${COLORS[si%COLORS.length]}"></span>${esc(sc.name)}</div></td>`;
+    miles.forEach(m=>{const r=rowMap[m];if(!r){mb+='<td style="color:var(--text3)">—</td>';return;}const hit=S.goals.some(g=>r.portfolio>=goalThreshold(g,r.age));mb+=`<td title="${fmtFull(r.portfolio)}" style="${hit?'color:var(--yellow);font-weight:700':'font-weight:600'}">${fmt(r.portfolio)}${hit?' 🎯':''}</td>`;});
+    mb+='</tr>';
+  });
+  document.querySelector('#milestone-table tbody').innerHTML=mh+mb;
+}
+
+function renderProjTable(){
+  const expand=document.getElementById('proj-expand').checked;
+  const modeStr=S.showNPV?`📊 NPV (ref ${S.npvYear})`:'💵 Future Nominal';
+  document.getElementById('proj-badge').textContent=modeStr;
+  const thead=document.getElementById('proj-thead');const tbody=document.getElementById('proj-tbody');
+  if(!S.scenarios.length){thead.innerHTML='<tr><th>Age</th><th>Year</th></tr>';tbody.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--text3);padding:16px">Add a scenario</td></tr>';return;}
+  const allRows=S.scenarios.map(sc=>runScenario(sc));
+  const AGES=ages();const miles=S.milestones;
+  let hh='<tr><th style="width:44px">Age</th><th style="width:44px">Yr</th>';
+  S.scenarios.forEach((sc,si)=>{const c=COLORS[si%COLORS.length];const p=`<span class="pill" style="background:${c}"></span>`;hh+=`<th>${p}Gross</th>`;if(expand){hh+=`<th>${p}SS+Med</th><th>${p}401k</th><th>${p}Fed</th><th>${p}State</th>`;}hh+=`<th>${p}Net</th><th>${p}Savings</th><th>${p}Spending</th><th style="background:${blendHex(c,0.15)}">${p}Portfolio</th>`;});
+  hh+='</tr>';thead.innerHTML=hh;
+  const goalHit=S.goals.map(()=>false);let bh='';
+  for(let ai=0;ai<AGES.length;ai++){
+    const age=AGES[ai];const isMile=miles.includes(age);
+    const gHit=S.goals.some((g,gi)=>{if(!goalHit[gi]&&allRows.some(rows=>rows[ai].portfolio>=goalThreshold(g,age))){goalHit[gi]=true;return true;}return false;});
+    let cls=isMile?'milestone-row':'';if(gHit)cls='goal-hit';
+    bh+=`<tr class="${cls}"><td>${age}${isMile?' 🎯':''}${gHit?' 🎯':''}</td><td style="color:var(--text3)">${ageYear(age)}</td>`;
+    S.scenarios.forEach((sc,si)=>{const r=allRows[si][ai];const c=COLORS[si%COLORS.length];bh+=`<td>${fmt(r.gross)}</td>`;if(expand){bh+=`<td>${fmt(r.ssTax+r.medTax)}</td><td>${fmt(r.k401)}</td><td>${fmt(r.fTax)}</td><td>${fmt(r.sTax)}</td>`;}bh+=`<td>${fmt(r.net)}</td><td>${fmt(r.savings)}</td><td>${fmt(r.spending)}</td><td class="port-col" style="background:rgba(${hexRgb(c)},.12);color:${c}" title="${fmtFull(r.portfolio)}">${fmt(r.portfolio)}</td>`;});
+    bh+='</tr>';
+  }
+  tbody.innerHTML=bh;
+}
+
+// ════════════════════════════════════════════
+// METRICS
+// ════════════════════════════════════════════
+function updateMetrics(){
+  const now=new Date();
+  document.getElementById('m-today').textContent=now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('m-today-sub').textContent=now.toLocaleDateString('en-US',{weekday:'long'});
+  document.getElementById('m-end-age').textContent=`Age ${S.endAge}`;
+  document.getElementById('m-end-year').textContent=ageYear(S.endAge);
+  document.getElementById('m-real-return').textContent=(S.marketReturn-S.inflationRate).toFixed(1)+'%';
+  document.getElementById('m-dollar-mode').textContent=S.showNPV?`📊 NPV (${S.npvYear})`:'💵 Future Nominal';
+  document.getElementById('m-npv-ref').textContent=`Infl: ${S.inflationRate}% | ref: ${S.npvYear}`;
+  document.getElementById('npv-toggle-label').textContent=S.showNPV?'Showing: NPV (purchasing power)':'Showing: Future Nominal $';
+  const portDiv=document.getElementById('m-port-all');
+  if(!S.scenarios.length){portDiv.innerHTML='<span style="color:var(--text3);font-size:11px">No scenarios</span>';return;}
+  portDiv.innerHTML=S.scenarios.map((sc,si)=>{const rows=runScenario(sc);const last=rows[rows.length-1];return`<div class="sc-port-row"><span class="sc-port-name"><span class="pill" style="background:${COLORS[si%COLORS.length]}"></span>${esc(sc.name)}</span><span class="sc-port-val" style="color:${COLORS[si%COLORS.length]}">${fmt(last.portfolio)}</span></div>`;}).join('');
+}
+
+// ════════════════════════════════════════════
+// SLIDER
+// ════════════════════════════════════════════
+function initSlider(){
+  const AGES=ages();
+  const sf=document.getElementById('slider-from');const st=document.getElementById('slider-to');
+  sf.min=0;sf.max=AGES.length-1;sf.value=0;
+  st.min=0;st.max=AGES.length-1;st.value=AGES.length-1;
+  updateSliderUI();
+}
+function updateSliderUI(){
+  const AGES=ages();
+  const sf=document.getElementById('slider-from');const st=document.getElementById('slider-to');
+  let fi=parseInt(sf.value),ti=parseInt(st.value);
+  if(fi>ti){fi=ti;sf.value=fi;}
+  const p1=fi/(AGES.length-1)*100,p2=ti/(AGES.length-1)*100;
+  document.getElementById('range-fill').style.left=p1+'%';
+  document.getElementById('range-fill').style.width=(p2-p1)+'%';
+  document.getElementById('slider-from-lbl').textContent=AGES[fi]||AGES[0];
+  document.getElementById('slider-to-lbl').textContent=AGES[ti]||AGES[AGES.length-1];
+}
+function onSlider(){updateSliderUI();renderPortfolioChart();}
+
+// ════════════════════════════════════════════
+// TAB SWITCHING
+// ════════════════════════════════════════════
+const MAIN_TABS=['fire','tax','ss','npv'];
+function switchMain(id,btn){
+  MAIN_TABS.forEach(t=>{document.getElementById('main-'+t).style.display=t===id?'':'none';});
+  document.querySelectorAll('.main-tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='tax'){syncTaxSel();renderTaxChart();runTaxCalc();}
+  if(id==='ss'){syncSSScSel();renderSSAll();}
+}
+const SUB_TABS={fire:['summary','projection','portfolio','breakdown','actualized','comp'],tax:['taxoverview','taxcalc'],ss:['ssproj','ssbreakeven','sswhatif']};
+function switchSub(section,id,btn){
+  SUB_TABS[section].forEach(t=>{document.getElementById(`${section}-${t}`).style.display=t===id?'':'none';});
+  btn.closest('.sub-tab-bar').querySelectorAll('.sub-tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='projection')renderProjTable();
+  if(id==='portfolio'){initSlider();renderPortfolioChart();}
+  if(id==='breakdown')renderBreakdownChart();
+  if(id==='summary')renderSummary();
+  if(id==='actualized')renderActualized();
+  if(id==='comp')renderComp();
+  if(id==='taxoverview')renderTaxChart();
+  if(id==='taxcalc')runTaxCalc();
+  if(id==='ssproj'||id==='ssbreakeven'||id==='sswhatif')renderSSAll();
+}
+function syncTaxSel(){
+  const sel=document.getElementById('tax-sc-sel');const prev=S.lastTaxSc;sel.innerHTML='';
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;sel.appendChild(o);});
+  const v=Math.min(prev,Math.max(0,S.scenarios.length-1));sel.value=v;S.lastTaxSc=v;
+}
+
+// ════════════════════════════════════════════
+// SIDEBAR
+// ════════════════════════════════════════════
+function toggleSidebar(){const sb=document.getElementById('sidebar');const hb=document.getElementById('hamburger');const ov=document.getElementById('overlay');const open=sb.classList.toggle('open');hb.classList.toggle('open',open);ov.classList.toggle('visible',open);}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('hamburger').classList.remove('open');document.getElementById('overlay').classList.remove('visible');}
+function toggleSec(id){document.getElementById(id).classList.toggle('collapsed');}
+
+// ════════════════════════════════════════════
+// SCENARIO UI
+// ════════════════════════════════════════════
+function renderScenarios(){
+  const list=document.getElementById('scenarios-list');list.innerHTML='';
+  S.scenarios.forEach((sc,si)=>{
+    const c=COLORS[si%COLORS.length];
+    const salOv=Object.keys(sc.salaryOverrides||{}).length;
+    const spnOv=Object.keys(sc.spendingOverrides||{}).length;
+    const savOv=Object.keys(sc.savingsOverrides||{}).length;
+    const mode=sc.controlMode||'spend';
+    const card=document.createElement('div');card.className=`sc-card${sc._open?' open':''}`;
+    card.innerHTML=`
+      <div class="sc-card-head" onclick="toggleScCard(${si})">
+        <div class="sc-dot" style="background:${c}"></div>
+        <input class="sc-name-inp" value="${esc(sc.name)}" onclick="event.stopPropagation()"
+          onchange="S.scenarios[${si}].name=this.value;recalc();syncAllSels()" placeholder="Scenario name"/>
+        <span class="sc-arr">▾</span>
+        <button class="sc-x" onclick="event.stopPropagation();removeSc(${si})">✕</button>
+      </div>
+      <div class="sc-body" style="display:${sc._open?'flex':'none'}">
+        <div>
+          <label style="margin-bottom:4px">Control Mode</label>
+          <div style="display:flex;gap:5px">
+            <button class="btn ${mode==='spend'?'btn-p':'btn-s'}" style="flex:1;justify-content:center" onclick="S.scenarios[${si}].controlMode='spend';renderScenarios();recalc()">🛒 Spending</button>
+            <button class="btn ${mode==='save'?'btn-p':'btn-s'}" style="flex:1;justify-content:center" onclick="S.scenarios[${si}].controlMode='save';renderScenarios();recalc()">💰 Savings</button>
+          </div>
+          <p class="note" style="margin-top:3px">${mode==='spend'?'Savings = net − spending':'Spending = net − savings'}</p>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-s" style="flex:1" onclick="openSalaryModal(${si})">💼 Salary${salOv?` (${salOv})`:''}</button>
+          ${mode==='spend'
+            ?`<button class="btn btn-s" style="flex:1" onclick="openSpendingModal(${si})">🛒 Spending${spnOv?` (${spnOv})`:''}</button>`
+            :`<button class="btn btn-s" style="flex:1" onclick="openSavingsModal(${si})">💰 Savings${savOv?` (${savOv})`:''}</button>`}
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+  syncAllSels();
+}
+function toggleScCard(si){S.scenarios[si]._open=!S.scenarios[si]._open;renderScenarios();}
+function syncAllSels(){
+  const bSel=document.getElementById('bar-sc-sel');bSel.innerHTML='';
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;bSel.appendChild(o);});
+  const bv=Math.min(S.lastBreakdownSc,Math.max(0,S.scenarios.length-1));bSel.value=bv;S.lastBreakdownSc=bv;
+  const tSel=document.getElementById('tax-sc-sel');tSel.innerHTML='';
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;tSel.appendChild(o);});
+  const tv=Math.min(S.lastTaxSc,Math.max(0,S.scenarios.length-1));tSel.value=tv;S.lastTaxSc=tv;
+  const sSel=document.getElementById('ss-sc-sel');sSel.innerHTML='';
+  S.scenarios.forEach((sc,i)=>{const o=document.createElement('option');o.value=i;o.textContent=sc.name;sSel.appendChild(o);});
+  const sv=Math.min(S.lastSSSc,Math.max(0,S.scenarios.length-1));sSel.value=sv;S.lastSSSc=sv;
+}
+function addScenario(){
+  const i=S.scenarios.length;
+  S.scenarios.push({name:`Scenario ${i+1}`,startSalary:65000,growthType:'none',growthVal:0,
+    controlMode:'spend',defaultSpending:50000,spendingGrowthType:'none',spendingGrowthVal:0,
+    defaultSavingsType:'pct',defaultSavingsVal:50,savingsGrowthType:'none',savingsGrowthVal:0,
+    salaryOverrides:{},spendingOverrides:{},savingsOverrides:{},_open:true});
+  renderScenarios();recalc();
+}
+function removeSc(si){
+  S.scenarios.splice(si,1);
+  ['lastBreakdownSc','lastTaxSc','lastSSSc'].forEach(k=>{if(S[k]>=S.scenarios.length)S[k]=Math.max(0,S.scenarios.length-1);});
+  renderScenarios();recalc();
+}
+
+// ════════════════════════════════════════════
+// GOALS UI
+// ════════════════════════════════════════════
+function renderGoals(){
+  const list=document.getElementById('goals-list');list.innerHTML='';
+  S.goals.forEach((g,i)=>{
+    const row=document.createElement('div');row.className='goal-row';
+    row.innerHTML=`<input type="text" value="${esc(g.label)}" placeholder="Label" style="flex:1.1" onchange="S.goals[${i}].label=this.value;recalc()"/><div class="ci-wrap" style="flex:1"><span class="ci-prefix">$</span><input type="text" value="${Math.round(g.amount).toLocaleString()}" oninput="fmtCI(this);S.goals[${i}].amount=parseFloat(this.value.replace(/,/g,''))||0;recalc()" onchange="S.goals[${i}].amount=parseFloat(this.value.replace(/,/g,''))||0;recalc()"/></div><button class="goal-rm" onclick="removeGoal(${i})">✕</button>`;
+    list.appendChild(row);
+  });
+}
+function addGoal(){S.goals.push({label:'',amount:1000000});renderGoals();recalc();}
+function removeGoal(i){S.goals.splice(i,1);renderGoals();recalc();}
+
+// ════════════════════════════════════════════
+// SALARY MODAL
+// ════════════════════════════════════════════
+function openSalaryModal(si){
+  editingSc=si;const sc=S.scenarios[si];
+  document.getElementById('salary-modal-title').textContent=`Salary Schedule — ${sc.name}`;
+  setCIVal('sc-start-salary',sc.startSalary||0);
+  document.getElementById('sc-growth-type').value=sc.growthType||'none';
+  document.getElementById('sc-growth-val').value=sc.growthVal||0;
+  updateSeedGrowthLabel();
+  document.getElementById('salary-modal').classList.add('open');renderSalaryTable();
+}
+function updateSeedGrowthLabel(){const t=document.getElementById('sc-growth-type').value;document.getElementById('sc-growth-val-lbl').textContent=t==='pct'?'Annual Growth (%)':(t==='fixed'?'Increase ($/yr)':'—');document.getElementById('sc-growth-val').disabled=t==='none';}
+function onSeedSalaryChange(){const sc=S.scenarios[editingSc];sc.startSalary=ciVal('sc-start-salary');sc.growthType=document.getElementById('sc-growth-type').value;sc.growthVal=parseFloat(document.getElementById('sc-growth-val').value)||0;updateSeedGrowthLabel();renderSalaryTable();recalc();}
+function renderSalaryTable(){
+  const sc=S.scenarios[editingSc];if(!sc.salaryOverrides)sc.salaryOverrides={};
+  let h='';
+  for(const age of ages()){
+    const ov=sc.salaryOverrides[age]!=null;
+    const npvVal=seededSalaryNPV(sc,age);
+    h+=`<tr class="${ov?'ov-hi':''}"><td>${age}</td><td>${ageYear(age)}</td><td style="color:var(--text3)">${fmt(npvVal)}</td><td><input type="text" value="${ov?Math.round(sc.salaryOverrides[age]).toLocaleString():''}" placeholder="${fmt(npvVal)}" oninput="fmtCI(this)" onblur="setScSalOv(${age},this.value)"/></td><td>${ov?`<button class="restore" onclick="restoreScSal(${age})">Restore</button>`:''}</td></tr>`;
+  }
+  document.getElementById('salary-tbody').innerHTML=h;
+}
+function setScSalOv(age,val){const sc=S.scenarios[editingSc];if(!sc.salaryOverrides)sc.salaryOverrides={};const n=parseFloat(val.replace(/,/g,''));if(isNaN(n)||val==='')delete sc.salaryOverrides[age];else sc.salaryOverrides[age]=n;renderSalaryTable();recalc();}
+function restoreScSal(age){delete S.scenarios[editingSc].salaryOverrides[age];renderSalaryTable();recalc();}
+function clearScSalary(){S.scenarios[editingSc].salaryOverrides={};renderSalaryTable();recalc();}
+
+// ════════════════════════════════════════════
+// SPENDING MODAL
+// ════════════════════════════════════════════
+function openSpendingModal(si){
+  editingSc=si;const sc=S.scenarios[si];
+  document.getElementById('spending-modal-title').textContent=`Spending Schedule — ${sc.name}`;
+  setCIVal('sc-default-spending',sc.defaultSpending||50000);
+  document.getElementById('sc-spending-growth-type').value=sc.spendingGrowthType||'none';
+  document.getElementById('sc-spending-growth-val').value=sc.spendingGrowthVal||0;
+  updateSeedSpendingLabel();
+  document.getElementById('spending-modal').classList.add('open');renderSpendingTable();
+}
+function updateSeedSpendingLabel(){
+  const t=document.getElementById('sc-spending-growth-type').value;
+  document.getElementById('sc-spending-growth-val-lbl').textContent=t==='pct'?'Annual Growth (%)':t==='fixed'?'Increase ($/yr)':'—';
+  document.getElementById('sc-spending-growth-val').disabled=t==='none';
+}
+function onSeedSpendingChange(){
+  const sc=S.scenarios[editingSc];
+  sc.defaultSpending=ciVal('sc-default-spending');
+  sc.spendingGrowthType=document.getElementById('sc-spending-growth-type').value;
+  sc.spendingGrowthVal=parseFloat(document.getElementById('sc-spending-growth-val').value)||0;
+  updateSeedSpendingLabel();renderSpendingTable();recalc();
+}
+function renderSpendingTable(){
+  const sc=S.scenarios[editingSc];if(!sc.spendingOverrides)sc.spendingOverrides={};
+  let h='';
+  for(const age of ages()){
+    const ov=sc.spendingOverrides[age]!=null;
+    const npvVal=seededSpendingNPV(sc,age);
+    h+=`<tr class="${ov?'ov-hi':''}"><td>${age}</td><td>${ageYear(age)}</td><td style="color:var(--text3)">${fmt(npvVal)}</td><td><input type="text" value="${ov?Math.round(sc.spendingOverrides[age]).toLocaleString():''}" placeholder="${fmt(npvVal)}" oninput="fmtCI(this)" onblur="setScSpnOv(${age},this.value)"/></td><td>${ov?`<button class="restore" onclick="restoreScSpn(${age})">Restore</button>`:''}</td></tr>`;
+  }
+  document.getElementById('spending-tbody').innerHTML=h;
+}
+function setScSpnOv(age,val){const sc=S.scenarios[editingSc];if(!sc.spendingOverrides)sc.spendingOverrides={};const n=parseFloat(val.replace(/,/g,''));if(isNaN(n)||val==='')delete sc.spendingOverrides[age];else sc.spendingOverrides[age]=n;renderSpendingTable();recalc();}
+function restoreScSpn(age){delete S.scenarios[editingSc].spendingOverrides[age];renderSpendingTable();recalc();}
+function clearScSpending(){S.scenarios[editingSc].spendingOverrides={};renderSpendingTable();recalc();}
+
+// ════════════════════════════════════════════
+// SAVINGS MODAL
+// ════════════════════════════════════════════
+function openSavingsModal(si){
+  editingSc=si;const sc=S.scenarios[si];
+  document.getElementById('savings-modal-title').textContent=`Savings Schedule — ${sc.name}`;
+  document.getElementById('sc-savings-type').value=sc.defaultSavingsType||'pct';
+  document.getElementById('sc-savings-default').value=sc.defaultSavingsVal??50;
+  document.getElementById('sc-savings-growth-type').value=sc.savingsGrowthType||'none';
+  document.getElementById('sc-savings-growth-val').value=sc.savingsGrowthVal||0;
+  updateSeedSavingsLabel();
+  document.getElementById('savings-modal').classList.add('open');renderSavingsTable();
+}
+function updateSeedSavingsLabel(){
+  const t=document.getElementById('sc-savings-type').value;
+  document.getElementById('sc-savings-default-lbl').textContent=t==='pct'?'Default % of Net':'Default $/yr';
+  const growthRow=document.getElementById('sc-savings-growth-row');
+  if(growthRow)growthRow.style.display=t==='dollar'?'block':'none';
+  if(t==='pct'){
+    const gtEl=document.getElementById('sc-savings-growth-type');if(gtEl)gtEl.value='none';
+    const gvEl=document.getElementById('sc-savings-growth-val');if(gvEl)gvEl.value=0;
+    if(S.scenarios[editingSc]){S.scenarios[editingSc].savingsGrowthType='none';S.scenarios[editingSc].savingsGrowthVal=0;}
+  }
+  const gt=document.getElementById('sc-savings-growth-type')?.value||'none';
+  const gvLbl=document.getElementById('sc-savings-growth-val-lbl');
+  if(gvLbl)gvLbl.textContent=gt==='pct'?'Growth (%/yr)':gt==='fixed'?'Increase ($/yr)':'—';
+  const gvEl=document.getElementById('sc-savings-growth-val');
+  if(gvEl)gvEl.disabled=gt==='none';
+}
+function onSeedSavingsChange(){
+  const sc=S.scenarios[editingSc];
+  sc.defaultSavingsType=document.getElementById('sc-savings-type').value;
+  sc.defaultSavingsVal=parseFloat(document.getElementById('sc-savings-default').value)||0;
+  sc.savingsGrowthType=document.getElementById('sc-savings-growth-type').value;
+  sc.savingsGrowthVal=parseFloat(document.getElementById('sc-savings-growth-val').value)||0;
+  updateSeedSavingsLabel();renderSavingsTable();recalc();
+}
+function renderSavingsTable(){
+  const sc=S.scenarios[editingSc];if(!sc.savingsOverrides)sc.savingsOverrides={};
+  const defType=sc.defaultSavingsType||'pct';const defVal=sc.defaultSavingsVal??50;
+  const unit=defType==='pct'?'%':'$';const defDesc=defType==='pct'?`${defVal}%`:`${fmt(defVal)}/yr`;
+  const tbl=document.querySelector('#savings-tbody')?.closest('table');
+  const hdrRow=tbl?.querySelector('thead tr');
+  if(hdrRow)hdrRow.innerHTML=`<th>Age</th><th>Year</th><th>Seeded (${unit})</th><th>Override (${unit})</th><th></th>`;
+  let h='';
+  for(const age of ages()){
+    const ov=sc.savingsOverrides[age];const hasOv=ov!=null;const curVal=hasOv?ov.val:defVal;
+    const inputStep=defType==='pct'?0.1:1000;
+    h+=`<tr class="${hasOv?'ov-hi':''}"><td>${age}</td><td>${ageYear(age)}</td>
+      <td style="color:var(--text3)">${defDesc}</td>
+      <td><input type="number" value="${hasOv?curVal:''}" placeholder="${curVal}" step="${inputStep}" min="0" onchange="setScSavVal(${age},this.value)"/></td>
+      <td>${hasOv?`<button class="restore" onclick="restoreScSav(${age})">Restore</button>`:''}</td></tr>`;
+  }
+  document.getElementById('savings-tbody').innerHTML=h;
+}
+function setScSavVal(age,val){const sc=S.scenarios[editingSc];if(!sc.savingsOverrides)sc.savingsOverrides={};const n=parseFloat(val);if(isNaN(n)||val===''){delete sc.savingsOverrides[age];}else{if(!sc.savingsOverrides[age])sc.savingsOverrides[age]={type:sc.defaultSavingsType||'pct',val:n};else sc.savingsOverrides[age].val=n;}recalc();}
+function restoreScSav(age){delete S.scenarios[editingSc].savingsOverrides[age];renderSavingsTable();recalc();}
+function clearScSavings(){S.scenarios[editingSc].savingsOverrides={};renderSavingsTable();recalc();}
+function closeModal(id){document.getElementById(id).classList.remove('open');recalc();}
+
+// ════════════════════════════════════════════
+// STATE PERSIST
+// ════════════════════════════════════════════
+function readGlobals(){
+  S.marketReturn=parseFloat(document.getElementById('g-return').value)||7;
+  S.withdrawalRate=parseFloat(document.getElementById('g-withdrawal').value)||4;
+  S.startAge=parseInt(document.getElementById('g-start-age').value)||23;
+  S.endAge=parseInt(document.getElementById('g-end-age').value)||65;
+  S.startMonth=parseInt(document.getElementById('g-start-month').value)||1;
+  S.birthdate=document.getElementById('g-birthdate').value;
+  S.filing=document.getElementById('g-filing').value;
+  S.stateCode=document.getElementById('g-state').value;
+  S.startBalance=ciVal('g-start-balance');
+  S.inflationRate=parseFloat(document.getElementById('g-inflation-rate').value)||3;
+  S.npvYear=parseInt(document.getElementById('g-npv-year').value)||2026;
+  S.showNPV=document.getElementById('g-show-npv').checked;
+  S.ss=parseFloat(document.getElementById('g-ss').value)||6.2;
+  S.ssCap=ciVal('g-ss-cap');
+  S.medicare=parseFloat(document.getElementById('g-medicare').value)||1.45;
+  S.medicareAdd=parseFloat(document.getElementById('g-medicare-add').value)||0.9;
+  S.k401=ciVal('g-401k');S.k401limit=ciVal('g-401k-limit');
+  const ms=document.getElementById('g-milestones').value;
+  S.milestones=ms.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n));
+}
+function applyStateToUI(){
+  document.getElementById('g-return').value=S.marketReturn;
+  document.getElementById('g-withdrawal').value=S.withdrawalRate;
+  document.getElementById('g-start-age').value=S.startAge;
+  document.getElementById('g-end-age').value=S.endAge;
+  document.getElementById('g-start-month').value=S.startMonth||1;
+  document.getElementById('g-birthdate').value=S.birthdate;
+  document.getElementById('g-filing').value=S.filing;
+  document.getElementById('g-state').value=S.stateCode;
+  setCIVal('g-start-balance',S.startBalance);
+  document.getElementById('g-inflation-rate').value=S.inflationRate;
+  document.getElementById('g-npv-year').value=S.npvYear;
+  document.getElementById('g-show-npv').checked=S.showNPV;
+  document.getElementById('g-ss').value=S.ss;
+  setCIVal('g-ss-cap',S.ssCap);
+  document.getElementById('g-medicare').value=S.medicare;
+  document.getElementById('g-medicare-add').value=S.medicareAdd;
+  setCIVal('g-401k',S.k401);setCIVal('g-401k-limit',S.k401limit);
+  document.getElementById('g-milestones').value=S.milestones.join(',');
+  update401kLimitLbl();renderGoals();renderScenarios();
+}
+// Data persisted via iCloud Drive JSON file (see saveToFile / autoLoad)
+
+// ════════════════════════════════════════════
+// RECALC — §6.1 fix applied: all three SS subtabs trigger renderSSAll
+// ════════════════════════════════════════════
+function recalc(){
+  readGlobals();markUnsaved();updateMetrics();
+  const AGES=ages();
+  const sf=document.getElementById('slider-from');const st=document.getElementById('slider-to');
+  sf.max=AGES.length-1;st.max=AGES.length-1;
+  if(parseInt(sf.value)>=AGES.length)sf.value=0;
+  if(parseInt(st.value)>=AGES.length)st.value=AGES.length-1;
+  updateSliderUI();
+  const vis=t=>document.getElementById(t)?.style?.display!=='none';
+  if(vis('fire-summary'))renderSummary();
+  if(vis('fire-projection'))renderProjTable();
+  if(vis('fire-portfolio'))renderPortfolioChart();
+  if(vis('fire-breakdown'))renderBreakdownChart();
+  if(vis('fire-actualized'))renderActualized();
+  if(vis('fire-comp'))renderComp();
+  if(vis('tax-taxoverview'))renderTaxChart();
+  if(vis('tax-taxcalc'))runTaxCalc();
+  if(vis('main-ss')&&(vis('ss-ssproj')||vis('ss-ssbreakeven')||vis('ss-sswhatif')))renderSSAll();
+}
+
+// ════════════════════════════════════════════
+// ACTUALIZED PORTFOLIO
+// ════════════════════════════════════════════
+let editingActAge=null;
+function editableActAges(){
+  const now=new Date();const curMonth=now.getMonth()+1;
+  return ages().filter(age=>{const y=ageYear(age);if(y<CUR_YEAR)return true;if(y===CUR_YEAR&&curMonth>=S.startMonth)return true;return false;});
+}
+function openActModal(age){
+  editingActAge=age;const d=S.actualized[age]||{};
+  document.getElementById('act-modal-title').textContent=`Age ${age} / ${ageYear(age)} — Actual Data`;
+  document.getElementById('act-filing').value=d.filing||S.filing;
+  document.getElementById('act-state').value=d.stateCode||S.stateCode;
+  setCIVal('act-gross',d.gross||'');setCIVal('act-spend',d.spend||'');setCIVal('act-portfolio',d.portfolio||'');
+  calcActRow();document.getElementById('act-modal').classList.add('open');
+}
+function calcActRow(){
+  const gross=ciVal('act-gross');const spend=ciVal('act-spend');const portfolio=ciVal('act-portfolio');
+  const filing=document.getElementById('act-filing').value;const state=document.getElementById('act-state').value;
+  if(!gross){document.getElementById('act-tax-preview').innerHTML='<span style="color:var(--text3)">Enter gross salary to see tax breakdown</span>';document.getElementById('act-calc-preview').innerHTML='';return;}
+  // Actualized: use current (2026) brackets — no inflation adjustment
+  const ssTax=Math.min(gross,S.ssCap)*(S.ss/100);
+  const medTax=gross*(S.medicare/100)+Math.max(0,gross-200000)*(S.medicareAdd/100);
+  const k401=Math.min(S.k401,S.k401limit);
+  const fTax=calcFedTax(gross,filing,k401,1);
+  const sTax=calcStTax(gross,state,1);
+  const net=gross-(ssTax+medTax+k401+fTax+sTax);
+  const totalTax=ssTax+medTax+fTax+sTax+k401;
+  const effRate=gross>0?totalTax/gross:0;
+  document.getElementById('act-tax-preview').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <div><div style="color:var(--text3);font-size:10px">Federal Tax</div><div style="font-weight:600">${fmt(fTax)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px">State Tax</div><div style="font-weight:600">${fmt(sTax)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px">SS+Medicare</div><div style="font-weight:600">${fmt(ssTax+medTax)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px">Net Income</div><div style="font-weight:600;color:var(--green)">${fmt(net)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px">Effective Rate</div><div style="font-weight:600;color:var(--yellow)">${fmtPct(effRate)}</div></div>
+    </div>`;
+  if(spend&&net){
+    const saved=net-spend;
+    document.getElementById('act-calc-preview').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><div style="color:var(--text3);font-size:10px">Net Saved</div><div style="font-weight:600;color:${saved>=0?'var(--green)':'var(--red)'}">${fmt(saved)}</div></div>
+        ${portfolio&&editingActAge&&(S.actualized[editingActAge-1]?.portfolio||editingActAge===S.startAge)?`<div><div style="color:var(--text3);font-size:10px">Portfolio Growth</div><div style="font-weight:600">${fmt(portfolio-(S.actualized[editingActAge-1]?.portfolio||S.startBalance))}</div></div>`:''}
+      </div>`;
+  } else document.getElementById('act-calc-preview').innerHTML='';
+}
+function saveActRow(){
+  const age=editingActAge;
+  if(!S.actualized[age])S.actualized[age]={};
+  Object.assign(S.actualized[age],{gross:ciVal('act-gross'),spend:ciVal('act-spend'),portfolio:ciVal('act-portfolio'),filing:document.getElementById('act-filing').value,stateCode:document.getElementById('act-state').value});
+  closeModal('act-modal');renderActualized();markUnsaved();
+}
+function clearActRow(){
+  delete S.actualized[editingActAge];
+  document.getElementById('act-filing').value=S.filing;document.getElementById('act-state').value=S.stateCode;
+  setCIVal('act-gross',0);setCIVal('act-spend',0);setCIVal('act-portfolio',0);calcActRow();
+}
+function renderActualized(){
+  const editable=editableActAges();
+  const allScRows=S.scenarios.map(sc=>runScenario(sc));
+  const thead=document.getElementById('act-thead');const tbody=document.getElementById('act-tbody');
+  let hh='<tr><th>Age</th><th>Year</th><th>Gross</th><th>Net</th><th>Eff. Tax %</th><th>Spend</th><th style="color:var(--green)">Saved</th><th style="color:var(--accent)">Portfolio</th><th>Δ Portfolio</th><th>Mkt Return</th>';
+  S.scenarios.forEach((sc,si)=>{hh+=`<th style="color:${COLORS[si%COLORS.length]}">vs ${esc(sc.name)}</th>`;});
+  hh+='</tr>';thead.innerHTML=hh;
+  if(!editable.length){tbody.innerHTML='<tr><td colspan="20" style="text-align:center;color:var(--text3);padding:20px">No completed review years yet.</td></tr>';return;}
+  let prevPortfolio=S.startBalance;let bh='';
+  editable.forEach(age=>{
+    const d=S.actualized[age];const hasData=d&&d.gross;const year=ageYear(age);
+    if(hasData){
+      const gross=d.gross;const filing=d.filing||S.filing;const state=d.stateCode||S.stateCode;
+      const ssTax=Math.min(gross,S.ssCap)*(S.ss/100);
+      const medTax=gross*(S.medicare/100)+Math.max(0,gross-200000)*(S.medicareAdd/100);
+      const k401=Math.min(S.k401,S.k401limit);
+      const fTax=calcFedTax(gross,filing,k401,1);const sTax=calcStTax(gross,state,1);
+      const net=gross-(ssTax+medTax+k401+fTax+sTax);
+      const totalTax=ssTax+medTax+fTax+sTax+k401;const effRate=gross>0?totalTax/gross:0;
+      const spend=d.spend||0;const saved=net-spend;const port=d.portfolio||0;
+      const deltaPort=port-prevPortfolio;const mktRet=prevPortfolio>0?(port-prevPortfolio-saved)/prevPortfolio:0;
+      const varHtml=S.scenarios.map((sc,si)=>{const AGES=ages();const ai=AGES.indexOf(age);const scRow=ai>=0?allScRows[si][ai]:null;if(!scRow)return'<td style="color:var(--text3)">—</td>';const diff=port-scRow.portfolioNominal;return`<td style="color:${diff>=0?'var(--green)':'var(--red)'};font-weight:600">${diff>=0?'+':''}${fmt(diff)}</td>`;}).join('');
+      prevPortfolio=port;
+      bh+=`<tr><td><button class="btn btn-s" style="padding:2px 8px;font-size:10px" onclick="openActModal(${age})">${age} ✏️</button></td><td style="color:var(--text3)">${year}</td><td>${fmt(gross)}</td><td>${fmt(net)}</td><td style="color:var(--yellow)">${fmtPct(effRate)}</td><td>${fmt(spend)}</td><td style="color:${saved>=0?'var(--green)':'var(--red)'};font-weight:600">${fmt(saved)}</td><td style="font-weight:700;color:var(--accent)">${fmt(port)}</td><td style="color:${deltaPort>=0?'var(--green)':'var(--red)'}">${deltaPort>=0?'+':''}${fmt(deltaPort)}</td><td style="color:var(--text2)">${(mktRet*100).toFixed(1)}%</td>${varHtml}</tr>`;
+    } else {
+      const varHtml=S.scenarios.map(()=>'<td style="color:var(--text3)">—</td>').join('');
+      bh+=`<tr style="opacity:0.5"><td><button class="btn btn-s" style="padding:2px 8px;font-size:10px" onclick="openActModal(${age})">${age} ✏️</button></td><td style="color:var(--text3)">${year}</td><td colspan="8" style="color:var(--text3)">Click to enter data</td>${varHtml}</tr>`;
+    }
+  });
+  tbody.innerHTML=bh;
+}
+
+// ════════════════════════════════════════════
+// NPV CALCULATOR
+// ════════════════════════════════════════════
+function calcNPV(){
+  document.getElementById('npv-error').textContent='';
+  document.getElementById('npv-result').style.display='none';
+  const pvStr=document.getElementById('npv-pv').value.replace(/,/g,'');
+  const fvStr=document.getElementById('npv-fv').value.replace(/,/g,'');
+  const nStr=document.getElementById('npv-n').value;
+  const rStr=document.getElementById('npv-r').value;
+  const pmtStr=document.getElementById('npv-pmt').value.replace(/,/g,'');
+  const blank=name=>document.getElementById(`npv-${name}`).value.trim()==='';
+  const blanks=['pv','fv','n','r'].filter(blank);
+  const pmt=pmtStr!==''&&pmtStr!=='-'?parseFloat(pmtStr):0;
+  const hasPMT=pmt!==0;
+  if(blanks.length===0&&!hasPMT){document.getElementById('npv-error').textContent='All fields are filled — leave exactly one blank.';return;}
+  if(blanks.length>1){const names={pv:'Present Value',fv:'Future Value',n:'Years',r:'Rate'};document.getElementById('npv-error').textContent=`Missing: ${blanks.map(b=>names[b]).join(', ')}.`;return;}
+  const pv=pvStr?parseFloat(pvStr):null;const fv=fvStr?parseFloat(fvStr):null;
+  const n=nStr?parseFloat(nStr):null;const r=rStr?parseFloat(rStr)/100:null;
+  const solving=blanks[0]||null;
+  function annuityFV(pmt,r,n){if(r===0)return pmt*12*n;const mr=r/12,mo=12*n;return pmt*((Math.pow(1+mr,mo)-1)/mr)*(1+mr);}
+  function annuityPV(pmt,r,n){if(r===0)return pmt*12*n;const mr=r/12,mo=12*n;return pmt*((1-Math.pow(1+mr,-mo))/mr)*(1+mr);}
+  let result=null,solvedLabel='',solvedVal=0;
+  try{
+    if(!solving){result={pv,fv,n,r,pmt};}
+    else if(solving==='fv'){const fvL=pv*Math.pow(1+r,n);solvedVal=fvL+(hasPMT?annuityFV(pmt,r,n):0);solvedLabel='Future Value';result={pv,fv:solvedVal,n,r,pmt};}
+    else if(solving==='pv'){const pvL=fv/Math.pow(1+r,n);solvedVal=pvL-(hasPMT?annuityPV(pmt,r,n):0);solvedLabel='Present Value';result={pv:solvedVal,fv,n,r,pmt};}
+    else if(solving==='n'){if(hasPMT){document.getElementById('npv-error').textContent='Solving for N with annuity not supported.';return;}if(pv<=0||fv<=0||r<=0){document.getElementById('npv-error').textContent='PV, FV and Rate must be positive.';return;}solvedVal=Math.log(fv/pv)/Math.log(1+r);solvedLabel='Years';result={pv,fv,n:solvedVal,r,pmt};}
+    else if(solving==='r'){if(hasPMT){document.getElementById('npv-error').textContent='Solving for Rate with annuity not supported.';return;}if(pv<=0||fv<=0||n<=0){document.getElementById('npv-error').textContent='PV, FV and Years must be positive.';return;}solvedVal=Math.pow(fv/pv,1/n)-1;solvedLabel='Annual Rate';result={pv,fv,n,r:solvedVal,pmt};}
+  }catch(e){document.getElementById('npv-error').textContent='Error: '+e.message;return;}
+  const wr=S.withdrawalRate/100;const endFV=result.fv||0;const aw=endFV*wr;
+  const content=document.getElementById('npv-result-content');
+  const row=(label,val,color='')=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">${label}</span><strong style="${color?`color:${color}`:''}">${val}</strong></div>`;
+  let html='';
+  if(solving)html+=`<div style="background:rgba(91,141,238,.1);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-weight:700;color:var(--accent)">Solved: ${solvedLabel} = ${solving==='r'?fmtPct(solvedVal):solving==='n'?solvedVal.toFixed(2)+' yrs':fmtFull(solvedVal)}</div>`;
+  html+=row('Present Value (PV)',fmtFull(result.pv||0));
+  html+=row('Annual Growth Rate',fmtPct(result.r||0));
+  html+=row('Years (N)',(result.n||0).toFixed(2));
+  if(hasPMT)html+=row('Annual Payment (PMT)',fmtFull(result.pmt||0),'var(--teal)');
+  html+=row('Future Value (FV)',fmtFull(result.fv||0),'var(--green)');
+  html+=`<div style="margin-top:10px;background:rgba(52,201,142,.1);border-radius:6px;padding:10px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Annual Withdrawal @ ${S.withdrawalRate}% rate</div><div style="font-size:20px;font-weight:700;color:var(--green);margin-top:4px">${fmtFull(aw)}<span style="font-size:12px;color:var(--text3)">/yr</span></div><div style="font-size:10px;color:var(--text3);margin-top:2px">Monthly: ${fmtFull(aw/12)}/mo</div></div>`;
+  content.innerHTML=html;document.getElementById('npv-result').style.display='block';
+}
+
+// ════════════════════════════════════════════
+// COMPENSATION CALCULATOR
+// ════════════════════════════════════════════
+const LTCG_BRACKETS={single:[[48350,0],[533400,.15],[Infinity,.20]],mfj:[[96700,0],[600050,.15],[Infinity,.20]],hoh:[[64750,0],[566700,.15],[Infinity,.20]]};
+const NIIT_THRESHOLD={single:200000,mfj:250000,hoh:200000};
+function calcLTCG(gain,filing,ordinaryIncome){
+  const brackets=LTCG_BRACKETS[filing]||LTCG_BRACKETS.single;
+  let tax=0,prev=0;const effective=Math.max(0,gain);
+  for(const [cap,rate] of brackets){
+    if(ordinaryIncome>=cap){prev=cap;continue;}
+    const room=cap-Math.max(ordinaryIncome,prev);const taxed=Math.min(effective,room);
+    if(taxed<=0){prev=cap;continue;}tax+=taxed*rate;if(taxed>=effective)break;prev=cap;
+  }
+  return tax;
+}
+function calcNIIT(gain,filing,magi){const thresh=NIIT_THRESHOLD[filing]||200000;const base=Math.max(0,Math.min(gain,magi-thresh));return base>0?base*0.038:0;}
+// displayFactorForYear: deflate a future calendar year's value to npvYear purchasing power
+function displayFactorForYear(year){
+  if(!S.showNPV)return 1;
+  const exp=year-S.npvYear;
+  if(exp===0)return 1;
+  return 1/Math.pow(1+S.inflationRate/100,exp);
+}
+function compPriceAtDate(co,dateStr){
+  const today=new Date();
+  const targetDate=dateStr?new Date(dateStr):today;
+  const msPerYear=365.25*24*3600*1000;
+  const yearsOut=(targetDate-today)/msPerYear;
+  if(yearsOut<=0)return co.currentPrice||0;
+  // NPV on: grow at real return (market - inflation); NPV off: grow at nominal market return
+  const growthRate=S.showNPV
+    ?(S.marketReturn-S.inflationRate)/100
+    :S.marketReturn/100;
+  return (co.currentPrice||0)*Math.pow(1+growthRate,yearsOut);
+}
+function generateVestEvents(grant){
+  const events=[];if(!grant.grantDate||!grant.totalShares)return events;
+  const gd=new Date(grant.grantDate);
+  if(grant.vestType==='cliff'){const vd=new Date(gd.getTime()+(grant.cliffMonths||12)*30.44*24*3600*1000);events.push({vestDate:vd.toISOString().slice(0,10),shares:grant.totalShares});}
+  else{const pct=(grant.vestPct||25)/100;const period=grant.vestPeriodMonths||12;let rem=grant.totalShares,t=1;while(rem>0){const vd=new Date(gd.getTime()+t*period*30.44*24*3600*1000);const shares=Math.min(rem,Math.round(grant.totalShares*pct));events.push({vestDate:vd.toISOString().slice(0,10),shares});rem-=shares;t++;if(t>100)break;}}
+  return events;
+}
+function isLongTerm(vd,sd){if(!vd||!sd)return false;return(new Date(sd)-new Date(vd))>365*24*3600*1000;}
+function readCompInputs(){S.comp.espp.pct=parseFloat(document.getElementById('comp-espp-pct').value)||0;S.comp.espp.disc=parseFloat(document.getElementById('comp-espp-disc').value)||15;}
+function addCompYear(){if(!S.comp.salaryYears)S.comp.salaryYears=[];const lastYear=S.comp.salaryYears.length>0?Math.max(...S.comp.salaryYears.map(y=>y.year)):CUR_YEAR-1;S.comp.salaryYears.push({year:lastYear+1,base:0,k401emp:0,matchPct:100,matchCap:6});S.comp.salaryYears.sort((a,b)=>a.year-b.year);renderCompSalaryTable();renderComp();}
+function removeCompYear(idx){S.comp.salaryYears.splice(idx,1);renderCompSalaryTable();renderComp();}
+function updateCompYear(idx,field,val){if(!S.comp.salaryYears[idx])return;S.comp.salaryYears[idx][field]=val;renderCompSalaryTable();renderComp();}
+function renderCompSalaryTable(){
+  const tbody=document.getElementById('comp-salary-tbody');if(!tbody)return;
+  const rows=S.comp.salaryYears||[];
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:14px">Click "+ Add Year" to add a salary year</td></tr>`;return;}
+  const inp='width:100%;padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);box-sizing:border-box';
+  tbody.innerHTML=rows.map((row,i)=>{const matchCeiling=row.base*(row.matchCap/100);const empMatch=Math.min(row.k401emp,matchCeiling)*(row.matchPct/100);
+    return`<tr><td style="padding:4px 8px"><input type="number" value="${row.year}" min="2000" max="2100" step="1" style="${inp}" onblur="updateCompYear(${i},'year',parseInt(this.value)||${CUR_YEAR})"/></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.base?Math.round(row.base).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'base',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.k401emp?Math.round(row.k401emp).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'k401emp',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchPct}" min="0" max="200" step="1" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchPct',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchCap}" min="0" max="100" step="0.5" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchCap',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;font-weight:600;color:var(--green);text-align:right">${fmtFull(empMatch)}</td><td style="padding:4px 8px;text-align:center"><button class="goal-rm" onclick="removeCompYear(${i})">✕</button></td></tr>`;
+  }).join('');
+}
+function computeAllVestEvents(){
+  const rows=[];
+  (S.comp.companies||[]).forEach(co=>{(co.grants||[]).forEach(grant=>{
+    generateVestEvents(grant).forEach(ev=>{
+      const vestFMV=compPriceAtDate(co,ev.vestDate);const incomeAtVest=ev.shares*vestFMV;
+      const ovKey=`${grant.id}_${ev.vestDate}`;const ov=(grant.saleOverrides&&grant.saleOverrides[ovKey])||{};
+      const sharesSold=ov.sharesSold!=null?ov.sharesSold:0;const saleDate=ov.saleDate||'';const salePrice=ov.salePrice!=null?ov.salePrice:vestFMV;
+      const lt=isLongTerm(ev.vestDate,saleDate);const gain=sharesSold*(salePrice-vestFMV);const filing=S.filing||'single';
+      let stTax=0,ltTax=0,niit=0;
+      if(sharesSold>0&&saleDate){const magi=(S.comp.base||0)+incomeAtVest;if(lt){ltTax=Math.max(0,calcLTCG(Math.max(0,gain),filing,magi));niit=calcNIIT(Math.max(0,gain),filing,magi);}else{const fd=FED[filing];const taxableBase=Math.max(0,magi-fd.std);stTax=Math.max(0,calcFedTax(taxableBase+Math.max(0,gain),filing,0,1)-calcFedTax(taxableBase,filing,0,1));}}
+      const grantYear=grant.grantDate?new Date(grant.grantDate).getFullYear():S.npvYear;
+      const grantFMV=(grant.grantPricePerShare||0)*displayFactorForYear(grantYear);
+      rows.push({companyName:co.name,grantDate:grant.grantDate,vestDate:ev.vestDate,shares:ev.shares,grantFMV,vestFMV,incomeAtVest,sharesSold,saleDate,salePrice,gain,lt,stGain:lt?0:Math.max(0,gain),ltGain:lt?Math.max(0,gain):0,stTax,ltTax,niit,totalTax:stTax+ltTax+niit,ovKey,grantId:grant.id,companyId:co.id});
+    });
+  });});
+  rows.sort((a,b)=>a.vestDate.localeCompare(b.vestDate));return rows;
+}
+function computeCompSummaryByYear(vestEvents){
+  const c=S.comp;const salMap={};
+  (c.salaryYears||[]).forEach(row=>{const matchCeiling=row.base*(row.matchCap/100);const empMatch=Math.min(row.k401emp,matchCeiling)*(row.matchPct/100);const disc=c.espp.disc/100;const esppIncome=disc<1?row.base*(c.espp.pct/100)*disc/(1-disc):0;salMap[row.year]={base:row.base,k401emp:row.k401emp,match:empMatch,esppIncome};});
+  const byYear={};
+  vestEvents.forEach(ev=>{const yr=ev.vestDate?new Date(ev.vestDate).getFullYear():CUR_YEAR;if(!byYear[yr])byYear[yr]={rsuIncome:0,rsuTax:0,stGain:0,ltGain:0};byYear[yr].rsuIncome+=ev.incomeAtVest;byYear[yr].rsuTax+=ev.totalTax;byYear[yr].stGain+=ev.stGain;byYear[yr].ltGain+=ev.ltGain;});
+  const allYears=new Set([...Object.keys(salMap).map(Number),...Object.keys(byYear).map(Number)]);
+  return[...allYears].sort((a,b)=>a-b).map(yr=>{const sal=salMap[yr]||{base:0,k401emp:0,match:0,esppIncome:0};const rsu=byYear[yr]||{rsuIncome:0,rsuTax:0,stGain:0,ltGain:0};const total=sal.base+rsu.rsuIncome+sal.match+sal.esppIncome;return{yr,base:sal.base,k401emp:sal.k401emp,match:sal.match,esppIncome:sal.esppIncome,rsuIncome:rsu.rsuIncome,rsuTax:rsu.rsuTax,stGain:rsu.stGain,ltGain:rsu.ltGain,total};});
+}
+function renderComp(){
+  readCompInputs();renderCompSalaryTable();
+  const vestEvents=computeAllVestEvents();const summaryRows=computeCompSummaryByYear(vestEvents);
+  document.getElementById('comp-summary-thead').innerHTML='<tr><th>Year</th><th>Base Salary</th><th>RSU Income</th><th>ESPP Income</th><th>401k Employee</th><th>401k Employer Match</th><th style="color:var(--green)">Total Comp</th><th>RSU Tax Owed</th></tr>';
+  document.getElementById('comp-summary-tbody').innerHTML=summaryRows.map(r=>`<tr><td style="font-weight:600">${r.yr}</td><td>${fmtFull(r.base)}</td><td>${r.rsuIncome>0?`<span style="color:var(--accent)">${fmtFull(r.rsuIncome)}</span>`:'—'}</td><td>${r.esppIncome>0?`<span style="color:var(--teal)">${fmtFull(r.esppIncome)}</span>`:'—'}</td><td>${r.k401emp>0?fmtFull(r.k401emp):'—'}</td><td>${r.match>0?`<span style="color:var(--green)">${fmtFull(r.match)}</span>`:'—'}</td><td style="font-weight:700;color:var(--green)">${fmtFull(r.total)}</td><td style="color:${r.rsuTax>0?'var(--red)':'var(--text3)'}">${r.rsuTax>0?fmtFull(r.rsuTax):'—'}</td></tr>`).join('');
+  const detailTbody=document.getElementById('comp-rsu-detail-tbody');
+  if(!vestEvents.length){detailTbody.innerHTML='<tr><td colspan="16" style="text-align:center;color:var(--text3);padding:16px">No RSU grants added yet</td></tr>';}
+  else detailTbody.innerHTML=vestEvents.map(ev=>`<tr><td style="font-weight:600">${esc(ev.companyName)}</td><td style="color:var(--text3)">${ev.grantDate}</td><td>${ev.vestDate}</td><td>${ev.shares.toLocaleString()}</td><td>${fmtFull(ev.grantFMV)}</td><td>${fmtFull(ev.vestFMV)}</td><td style="color:var(--accent)">${fmtFull(ev.incomeAtVest)}</td><td><input type="number" value="${ev.sharesSold||''}" placeholder="0" min="0" max="${ev.shares}" style="width:70px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','sharesSold',parseInt(this.value)||0)"/></td><td><input type="date" value="${ev.saleDate||''}" style="width:120px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','saleDate',this.value)"/></td><td><div class="ci-wrap" style="width:90px"><span class="ci-prefix">$</span><input type="text" value="${ev.salePrice?Math.round(ev.salePrice).toLocaleString():''}" placeholder="${fmtFull(ev.vestFMV)}" style="padding-left:14px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" oninput="fmtCI(this)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','salePrice',parseFloat(this.value.replace(/,/g,''))||0)"/></div></td><td style="color:var(--red)">${ev.stGain>0?fmtFull(ev.stGain):'—'}</td><td style="color:var(--green)">${ev.ltGain>0?fmtFull(ev.ltGain):'—'}</td><td style="color:var(--red)">${ev.stTax>0?fmtFull(ev.stTax):'—'}</td><td style="color:var(--green)">${ev.ltTax>0?fmtFull(ev.ltTax):'—'}</td><td style="color:var(--yellow)">${ev.niit>0?fmtFull(ev.niit):'—'}</td><td style="font-weight:700;color:${ev.totalTax>0?'var(--red)':'var(--text3)'}">${ev.totalTax>0?fmtFull(ev.totalTax):'—'}</td></tr>`).join('');
+  renderCompanyCards();
+}
+function setRSUSaleOv(grantId,vestDate,field,val){
+  for(const co of S.comp.companies||[]){for(const gr of co.grants||[]){if(gr.id===grantId){if(!gr.saleOverrides)gr.saleOverrides={};const key=`${grantId}_${vestDate}`;if(!gr.saleOverrides[key])gr.saleOverrides[key]={};gr.saleOverrides[key][field]=val;renderComp();return;}}}
+}
+function addCompany(){if(!S.comp.companies)S.comp.companies=[];S.comp.companies.push({id:'co_'+Date.now(),name:'Company',ticker:'',currentPrice:100,priceGrowthPct:0,grants:[],_open:true});renderComp();}
+function removeCompany(id){S.comp.companies=(S.comp.companies||[]).filter(c=>c.id!==id);renderComp();}
+function addGrant(companyId){const co=(S.comp.companies||[]).find(c=>c.id===companyId);if(!co)return;if(!co.grants)co.grants=[];co.grants.push({id:'gr_'+Date.now(),grantDate:new Date().toISOString().slice(0,10),totalShares:1000,grantPricePerShare:0,vestType:'pct_period',vestPct:25,vestPeriodMonths:12,cliffMonths:12,saleOverrides:{}});renderComp();}
+function removeGrant(companyId,grantId){const co=(S.comp.companies||[]).find(c=>c.id===companyId);if(!co)return;co.grants=(co.grants||[]).filter(g=>g.id!==grantId);renderComp();}
+function renderCompanyCards(){
+  const container=document.getElementById('comp-companies');if(!container)return;
+  if(!(S.comp.companies||[]).length){container.innerHTML='<p class="note" style="padding:8px 0">No companies added. Click &quot;+ Add Company&quot; to start.</p>';return;}
+  container.innerHTML=(S.comp.companies||[]).map((co)=>`
+    <div class="comp-company-card">
+      <div class="comp-company-head" onclick="toggleCompany('${co.id}')">
+        <input class="comp-company-name" value="${esc(co.name)}" onclick="event.stopPropagation()" onblur="updateCompanyField('${co.id}','name',this.value)" placeholder="Company name"/>
+        <span style="font-size:9px;color:var(--text3);transition:transform .2s;transform:rotate(${co._open?'180':'0'}deg)">▾</span>
+        <button class="sc-x" onclick="event.stopPropagation();removeCompany('${co.id}')">✕</button>
+      </div>
+      <div class="comp-company-body" style="display:${co._open?'flex':'none'}">
+        <div class="g2">
+          <div class="field"><label>Ticker / Name</label><input type="text" value="${esc(co.ticker||'')}" placeholder="AAPL" onblur="updateCompanyField('${co.id}','ticker',this.value)"/></div>
+          <div class="field"><label>Current Stock Price ($)</label><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${Math.round(co.currentPrice||0).toLocaleString()}" oninput="fmtCI(this)" onblur="updateCompanyField('${co.id}','currentPrice',parseFloat(this.value.replace(/,/g,''))||0)"/></div><p class="note" style="margin-top:4px">Today's price. Future vest dates grow at market return (${S.marketReturn}%/yr).</p></div>
+        </div>
+        <div class="divider"></div>
+        <div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px">RSU GRANTS</div>
+        ${(co.grants||[]).map(gr=>`
+          <div style="background:var(--bg4);border-radius:6px;padding:10px;position:relative">
+            <button class="sc-x" style="position:absolute;top:6px;right:6px" onclick="removeGrant('${co.id}','${gr.id}')">✕</button>
+            <div class="g3">
+              <div class="field"><label>Grant Date</label><input type="date" value="${gr.grantDate||''}" onblur="updateGrantField('${co.id}','${gr.id}','grantDate',this.value)"/></div>
+              <div class="field"><label>Total RSUs</label><input type="number" value="${gr.totalShares||0}" min="0" step="1" onblur="updateGrantField('${co.id}','${gr.id}','totalShares',parseInt(this.value)||0)"/></div>
+              <div class="field"><label>Grant Price / Share ($)</label><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${Math.round(gr.grantPricePerShare||0).toLocaleString()}" oninput="fmtCI(this)" onblur="updateGrantField('${co.id}','${gr.id}','grantPricePerShare',parseFloat(this.value.replace(/,/g,''))||0)"/></div></div>
+            </div>
+            <div class="g3" style="margin-top:6px">
+              <div class="field"><label>Vest Type</label>
+                <select onchange="updateGrantField('${co.id}','${gr.id}','vestType',this.value)">
+                  <option value="pct_period" ${gr.vestType==='pct_period'?'selected':''}>% every N months</option>
+                  <option value="cliff" ${gr.vestType==='cliff'?'selected':''}>Cliff (all at once)</option>
+                </select></div>
+              ${gr.vestType==='cliff'
+                ?`<div class="field"><label>Cliff (months)</label><input type="number" value="${gr.cliffMonths||12}" min="1" onblur="updateGrantField('${co.id}','${gr.id}','cliffMonths',parseInt(this.value)||12)"/></div>`
+                :`<div class="field"><label>Vest % per period</label><input type="number" value="${gr.vestPct||25}" min="1" max="100" step="1" onblur="updateGrantField('${co.id}','${gr.id}','vestPct',parseFloat(this.value)||25)"/></div>
+                  <div class="field"><label>Period (months)</label><input type="number" value="${gr.vestPeriodMonths||12}" min="1" onblur="updateGrantField('${co.id}','${gr.id}','vestPeriodMonths',parseInt(this.value)||12)"/></div>`}
+            </div>
+          </div>`).join('')}
+        <button class="btn btn-s" style="align-self:flex-start" onclick="addGrant('${co.id}')">+ Add Grant</button>
+      </div>
+    </div>`).join('');
+}
+function toggleCompany(id){const co=(S.comp.companies||[]).find(c=>c.id===id);if(co)co._open=!co._open;renderCompanyCards();}
+function updateCompanyField(id,field,val){const co=(S.comp.companies||[]).find(c=>c.id===id);if(co){co[field]=val;renderComp();}}
+function updateGrantField(companyId,grantId,field,val){const co=(S.comp.companies||[]).find(c=>c.id===companyId);const gr=co&&(co.grants||[]).find(g=>g.id===grantId);if(gr){gr[field]=val;renderComp();}}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+function initStateSelectors(){
+  const g=document.getElementById('g-state');const cc=document.getElementById('calc-state');const ac=document.getElementById('act-state');
+  Object.entries(ST).sort((a,b)=>a[1].name.localeCompare(b[1].name)).forEach(([code,s])=>{
+    [g,cc,ac].forEach(sel=>{const o=document.createElement('option');o.value=code;o.textContent=s.name;sel.appendChild(o);});
+  });
+}
+
+// ════════════════════════════════════════════
+// FILE SYSTEM — iCloud Drive persistence
+// ════════════════════════════════════════════
+let _unsaved=false;
+const _IDB='fire_idb',_IDB_STORE='kv';
+
+function _idbOpen(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(_IDB,1);
+    r.onupgradeneeded=e=>e.target.result.createObjectStore(_IDB_STORE);
+    r.onsuccess=e=>res(e.target.result);
+    r.onerror=rej;
+  });
+}
+async function idbGet(key){
+  try{const db=await _idbOpen();return new Promise(res=>{const r=db.transaction(_IDB_STORE).objectStore(_IDB_STORE).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);});}catch(e){return null;}
+}
+async function idbSet(key,val){
+  try{const db=await _idbOpen();return new Promise(res=>{const tx=db.transaction(_IDB_STORE,'readwrite');tx.objectStore(_IDB_STORE).put(val,key);tx.oncomplete=res;tx.onerror=res;});}catch(e){}
+}
+
+function markUnsaved(){
+  if(_unsaved)return;_unsaved=true;
+  const btn=document.getElementById('save-btn');
+  if(btn){btn.style.background='var(--yellow)';btn.style.color='#1a1d27';btn.textContent='💾 Save ●';}
+  const st=document.getElementById('save-status');
+  if(st)st.textContent='Unsaved changes';
+}
+function markSaved(){
+  _unsaved=false;
+  const btn=document.getElementById('save-btn');
+  if(btn){btn.style.background='';btn.style.color='';btn.textContent='💾 Save';}
+  const st=document.getElementById('save-status');
+  if(st){st.style.color='var(--green)';st.textContent='✓ Saved';setTimeout(()=>{if(!_unsaved&&st){st.textContent='';st.style.color='var(--text3)';}},2000);}
+}
+
+const HAS_FSA=typeof window!=='undefined'&&'showOpenFilePicker' in window;
+const HAS_WRITE=HAS_FSA&&typeof FileSystemFileHandle!=='undefined'&&'createWritable' in FileSystemFileHandle.prototype;
+
+// ── Connected-file status UI ────────────────────────────────
+async function updateFileStatusUI(){
+  const el=document.getElementById('file-status');
+  if(!el)return;
+  if(!HAS_WRITE){
+    el.innerHTML='<span style="color:var(--text3)">📱 Downloads only</span>';
+    return;
+  }
+  const handle=await idbGet('fileHandle');
+  if(handle&&handle.name){
+    const perm = await handle.queryPermission({mode:'readwrite'});
+    if(perm === 'granted'){
+      el.innerHTML='<span style="color:var(--green)" title="Connected file">📄 '+esc(handle.name)+'</span>'
+        +'<button class="btn btn-s" style="padding:1px 7px;font-size:10px;margin-left:5px" onclick="disconnectFile()">Disconnect</button>';
+    } else {
+      el.innerHTML='<span style="color:var(--yellow)" title="File permission required">📄 '+esc(handle.name)+' (Locked)</span>'
+        +'<button class="btn btn-s" style="padding:1px 7px;font-size:10px;margin-left:5px;background:var(--green);color:white" onclick="reconnectFile()">Allow Access</button>'
+        +'<button class="btn btn-s" style="padding:1px 7px;font-size:10px;margin-left:5px" onclick="disconnectFile()">Disconnect</button>';
+    }
+  } else {
+    el.innerHTML='<span style="color:var(--text3)">No file connected</span>';
+  }
+}
+async function disconnectFile(){
+  await idbSet('fileHandle',null);
+  await updateFileStatusUI();
+  const st=document.getElementById('save-status');
+  if(st){st.style.color='var(--text3)';st.textContent='File disconnected';
+    setTimeout(()=>{if(st.textContent==='File disconnected')st.textContent='';},2000);}
+}
+async function reconnectFile(){
+  const handle = await idbGet('fileHandle');
+  if(!handle)return;
+  if(await _getWritePerm(handle)){
+    const success = await _loadFromHandle(handle);
+    if(success){
+      const st=document.getElementById('save-status');
+      if(st){st.style.color='var(--green)';st.textContent='File reconnected and loaded';
+        setTimeout(()=>{if(st.textContent==='File reconnected and loaded')st.textContent='';},2000);}
+    }
+    await updateFileStatusUI();
+  }
+}
+
+async function _getWritePerm(handle){
+  let p=await handle.queryPermission({mode:'readwrite'});
+  if(p==='granted')return true;
+  p=await handle.requestPermission({mode:'readwrite'});
+  return p==='granted';
+}
+
+async function saveToFile(){
+  const data=JSON.stringify(S,null,2);
+  if(HAS_WRITE){
+    let handle=await idbGet('fileHandle');
+    if(!handle){
+      try{
+        if('showSaveFilePicker' in window){
+          handle=await window.showSaveFilePicker({suggestedName:'fire_v7.json',types:[{description:'FIRE Dashboard Data',accept:{'application/json':['.json']}}]});
+        } else {
+          [handle]=await window.showOpenFilePicker({types:[{description:'FIRE Dashboard Data',accept:{'application/json':['.json']}}]});
+        }
+        await idbSet('fileHandle',handle);
+      }catch(e){if(e.name!=='AbortError')console.error(e);return;}
+    }
+    if(!(await _getWritePerm(handle))){alert('Write permission denied.');return;}
+    try{
+      const w=await handle.createWritable();
+      await w.write(data);await w.close();
+      markSaved();
+      await updateFileStatusUI();
+    }catch(e){
+      // Handle may be stale — clear it and retry next save
+      await idbSet('fileHandle',null);
+      await updateFileStatusUI();
+      console.error('Save failed:',e);
+      alert('Save failed. Please try again to re-select the file.');
+    }
+  } else {
+    // Fallback: download JSON (iPhone/iPad)
+    const a=document.createElement('a');
+    a.href='data:application/json,'+encodeURIComponent(data);
+    a.download='fire_v7.json';a.click();
+    markSaved();
+  }
+}
+
+async function pickAndLoad(){
+  if(HAS_FSA){
+    try{
+      const [handle]=await window.showOpenFilePicker({types:[{description:'FIRE Dashboard Data',accept:{'application/json':['.json']}}]});
+      await idbSet('fileHandle',handle);
+      await updateFileStatusUI();
+      await _loadFromHandle(handle);
+    }catch(e){if(e.name!=='AbortError')console.error(e);}
+  } else {
+    const input=document.createElement('input');
+    input.type='file';input.accept='.json,application/json';
+    input.onchange=async()=>{if(!input.files[0])return;const txt=await input.files[0].text();_applyJSON(txt);};
+    input.click();
+  }
+}
+
+async function _loadFromHandle(handle){
+  try{
+    const file=await handle.getFile();
+    const text=await file.text();
+    _applyJSON(text);
+    return true;
+  }catch(e){
+    console.error('Load failed:',e);
+    return false;
+  }
+}
+
+function _applyJSON(text){
+  try{
+    const saved=JSON.parse(text);
+    if(!saved||typeof saved!=='object')throw new Error('Invalid');
+    // Migrations
+    if(!saved.actualized)saved.actualized={};
+    if(!saved.comp)saved.comp={salaryYears:[],companies:[],espp:{pct:10,disc:15}};
+    if(!saved.comp.salaryYears)saved.comp.salaryYears=[];
+    if(!saved.comp.companies)saved.comp.companies=[];
+    if(!saved.comp.espp)saved.comp.espp={pct:10,disc:15};
+    if(saved.comp.base!=null&&saved.comp.year&&saved.comp.salaryYears.length===0)
+      saved.comp.salaryYears=[{year:saved.comp.year,base:saved.comp.base||0,k401emp:saved.comp.k401emp||0,matchPct:saved.comp.k401matchPct||100,matchCap:saved.comp.k401matchCap||6}];
+    if(saved.scenarios)saved.scenarios.forEach(s=>{s._open=false;});
+    Object.assign(S,saved);
+    applyStateToUI();
+    markSaved();
+    recalc();
+  }catch(e){alert('Invalid or corrupt FIRE data file.');}
+}
+
+async function autoLoad(){
+  if(!HAS_WRITE)return;
+  const handle=await idbGet('fileHandle');
+  if(!handle)return;
+  
+  const perm = await handle.queryPermission({mode:'readwrite'});
+  if(perm === 'granted'){
+    await _loadFromHandle(handle);
+  }
+  await updateFileStatusUI();
+}
+
+// Warn before closing with unsaved changes
+window.addEventListener('beforeunload',e=>{if(_unsaved){e.preventDefault();e.returnValue='';}});
+
+function init(){
+  initStateSelectors();
+  // Set up default state first — autoLoad will override if file found
+  S.scenarios=[{name:'Base Case',startSalary:65000,growthType:'none',growthVal:0,controlMode:'spend',defaultSpending:50000,defaultSavingsType:'pct',defaultSavingsVal:50,salaryOverrides:{},spendingOverrides:{},savingsOverrides:{},_open:false}];
+  renderGoals();renderScenarios();
+  initSlider();renderSummary();
+  // Attempt to load from iCloud Drive file (async — re-renders if found)
+  autoLoad();
+  updateFileStatusUI();
+}
+init();
+</script>
+</body>
+</html>

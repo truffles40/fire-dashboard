@@ -349,14 +349,16 @@ input:checked+.tsl:before{transform:translateX(14px);background:#fff}
       <div class="card">
         <div class="card-title">Total Compensation Summary <span class="note" style="font-weight:400">by calendar year</span></div>
         <div style="overflow-x:auto"><table class="dt" id="comp-summary-table"><thead id="comp-summary-thead"></thead><tbody id="comp-summary-tbody"></tbody></table></div>
+      <p class="note" id="comp-summary-warn" style="margin-top:6px"></p>
       </div>
       <div class="card" style="margin-top:12px">
         <div class="card-title">Base Salary &amp; Benefits by Year <button class="btn btn-p btn-sm" onclick="addCompYear()">+ Add Year</button></div>
         <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-          <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:560px">
+          <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:700px">
             <thead><tr>
               <th style="text-align:left;width:80px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Year</th>
               <th style="width:150px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Base Salary ($)</th>
+          <th style="width:130px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Bonus ($)</th>
               <th style="width:140px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">401k Employee ($)</th>
               <th style="width:100px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Match (%)</th>
               <th style="width:120px;background:var(--bg2);padding:6px 8px;border-bottom:2px solid var(--border);color:var(--text3);position:sticky;top:0">Cap (% sal.)</th>
@@ -380,12 +382,12 @@ input:checked+.tsl:before{transform:translateX(14px);background:#fff}
         <p class="note" style="margin-top:6px">ESPP income = Salary × Contribution% × Discount% ÷ (1 − Discount%).</p>
       </div>
       <div class="card" style="margin-top:12px">
-        <div class="card-title">RSU Vest Event Detail</div>
+        <div class="card-title">RSU Vest Event Detail <span class="note" style="font-weight:400">Vest Tax = federal tax on top of that year's base + bonus + ESPP − 401k. Sale taxes (ST/LT/NIIT) are booked to the sale year in the summary.</span></div>
         <div style="overflow-x:auto;max-height:500px">
           <table class="dt" id="comp-rsu-detail-table">
             <thead><tr>
               <th style="text-align:left">Company</th><th style="text-align:left">Grant Date</th><th>Vest Date</th>
-              <th>Shares</th><th>Grant FMV</th><th>Vest FMV</th><th>Income ($)</th>
+              <th>Shares</th><th>Grant FMV</th><th>Vest FMV</th><th>Income ($)</th><th>Vest Tax</th>
               <th>Sold</th><th>Sale Date</th><th>Sale Price</th>
               <th>ST Gain</th><th>LT Gain</th><th>ST Tax</th><th>LT Tax</th><th>NIIT</th><th>Total Tax</th>
             </tr></thead>
@@ -2019,17 +2021,63 @@ function generateVestEvents(grant){
 }
 function isLongTerm(vd,sd){if(!vd||!sd)return false;return(new Date(sd)-new Date(vd))>365*24*3600*1000;}
 function readCompInputs(){S.comp.espp.pct=parseFloat(document.getElementById('comp-espp-pct').value)||0;S.comp.espp.disc=parseFloat(document.getElementById('comp-espp-disc').value)||15;}
-function addCompYear(){if(!S.comp.salaryYears)S.comp.salaryYears=[];const lastYear=S.comp.salaryYears.length>0?Math.max(...S.comp.salaryYears.map(y=>y.year)):CUR_YEAR-1;S.comp.salaryYears.push({year:lastYear+1,base:0,k401emp:0,matchPct:100,matchCap:6});S.comp.salaryYears.sort((a,b)=>a.year-b.year);renderCompSalaryTable();renderComp();}
+function addCompYear(){if(!S.comp.salaryYears)S.comp.salaryYears=[];const lastYear=S.comp.salaryYears.length>0?Math.max(...S.comp.salaryYears.map(y=>y.year)):CUR_YEAR-1;S.comp.salaryYears.push({year:lastYear+1,base:0,bonus:0,k401emp:0,matchPct:100,matchCap:6});S.comp.salaryYears.sort((a,b)=>a.year-b.year);renderCompSalaryTable();renderComp();}
 function removeCompYear(idx){S.comp.salaryYears.splice(idx,1);renderCompSalaryTable();renderComp();}
 function updateCompYear(idx,field,val){if(!S.comp.salaryYears[idx])return;S.comp.salaryYears[idx][field]=val;renderCompSalaryTable();renderComp();}
 function renderCompSalaryTable(){
   const tbody=document.getElementById('comp-salary-tbody');if(!tbody)return;
   const rows=S.comp.salaryYears||[];
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:14px">Click "+ Add Year" to add a salary year</td></tr>`;return;}
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:14px">Click "+ Add Year" to add a salary year</td></tr>`;return;}
   const inp='width:100%;padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);box-sizing:border-box';
   tbody.innerHTML=rows.map((row,i)=>{const matchCeiling=row.base*(row.matchCap/100);const empMatch=Math.min(row.k401emp,matchCeiling)*(row.matchPct/100);
-    return`<tr><td style="padding:4px 8px"><input type="number" value="${row.year}" min="2000" max="2100" step="1" style="${inp}" onblur="updateCompYear(${i},'year',parseInt(this.value)||${CUR_YEAR})"/></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.base?Math.round(row.base).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'base',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.k401emp?Math.round(row.k401emp).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'k401emp',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchPct}" min="0" max="200" step="1" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchPct',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchCap}" min="0" max="100" step="0.5" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchCap',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;font-weight:600;color:var(--green);text-align:right">${fmtFull(empMatch)}</td><td style="padding:4px 8px;text-align:center"><button class="goal-rm" onclick="removeCompYear(${i})">✕</button></td></tr>`;
+    return`<tr><td style="padding:4px 8px"><input type="number" value="${row.year}" min="2000" max="2100" step="1" style="${inp}" onblur="updateCompYear(${i},'year',parseInt(this.value)||${CUR_YEAR})"/></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.base?Math.round(row.base).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'base',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.bonus?Math.round(row.bonus).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'bonus',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px"><div class="ci-wrap"><span class="ci-prefix">$</span><input type="text" value="${row.k401emp?Math.round(row.k401emp).toLocaleString():''}" placeholder="0" oninput="fmtCI(this)" onblur="updateCompYear(${i},'k401emp',parseFloat(this.value.replace(/,/g,''))||0)" style="${inp};padding-left:14px"/></div></td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchPct}" min="0" max="200" step="1" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchPct',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;white-space:nowrap"><input type="number" value="${row.matchCap}" min="0" max="100" step="0.5" style="width:calc(100% - 18px);padding:3px 6px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="updateCompYear(${i},'matchCap',parseFloat(this.value)||0)"/> %</td><td style="padding:4px 8px;font-weight:600;color:var(--green);text-align:right">${fmtFull(empMatch)}</td><td style="padding:4px 8px;text-align:center"><button class="goal-rm" onclick="removeCompYear(${i})">✕</button></td></tr>`;
   }).join('');
+}
+// Ordinary income (AGI-style) per calendar year BEFORE RSUs: base + bonus + ESPP income - 401k employee
+function compYearOrdinary(){
+  const c=S.comp,m={},disc=c.espp.disc/100;
+  (c.salaryYears||[]).forEach(r=>{
+    const esppIncome=disc<1?(r.base||0)*(c.espp.pct/100)*disc/(1-disc):0;
+    m[r.year]={ord:Math.max(0,(r.base||0)+(r.bonus||0)+esppIncome-(r.k401emp||0))};
+  });
+  return m;
+}
+// Assigns vestTax / stTax / ltTax / niit / saleTax / totalTax to each vest event.
+// Vest tax: federal tax on top of the year's ordinary income, vests stacked in date order.
+// Sale tax: booked to the SALE year; ST gains stack on ordinary income, LT gains stack above that.
+function applyRsuTaxes(rows){
+  const filing=S.filing||'single';const fd=FED[filing]||FED.single;
+  const yrOf=d=>d?new Date(d).getFullYear():null;
+  const base=compYearOrdinary();const ord={};const ltRun={};
+  const getOrd=y=>{if(ord[y]==null)ord[y]=base[y]?base[y].ord:0;return ord[y];};
+  const fedTax=x=>calcFedTax(x,filing,0,1);
+  rows.forEach(r=>{
+    r.vestYear=yrOf(r.vestDate)||CUR_YEAR;
+    r.saleYear=(r.sharesSold>0&&r.saleDate)?yrOf(r.saleDate):null;
+    r.vestTax=0;r.stTax=0;r.ltTax=0;r.niit=0;
+  });
+  // 1) vest tax, chronological
+  [...rows].sort((a,b)=>a.vestDate.localeCompare(b.vestDate)).forEach(r=>{
+    const y=r.vestYear;const before=getOrd(y);
+    r.vestTax=Math.max(0,fedTax(before+r.incomeAtVest)-fedTax(before));
+    ord[y]=before+r.incomeAtVest;
+  });
+  const sales=rows.filter(r=>r.saleYear!=null&&r.gain>0).sort((a,b)=>a.saleDate.localeCompare(b.saleDate));
+  // 2) short-term gains: ordinary rates, stacked above vest income
+  sales.filter(r=>!r.lt).forEach(r=>{
+    const y=r.saleYear,before=getOrd(y);
+    r.stTax=Math.max(0,fedTax(before+r.gain)-fedTax(before));
+    r.niit=calcNIIT(r.gain,filing,before+r.gain);
+    ord[y]=before+r.gain;
+  });
+  // 3) long-term gains: stacked above all ordinary income (taxable, after std deduction)
+  sales.filter(r=>r.lt).forEach(r=>{
+    const y=r.saleYear,agi=getOrd(y),prior=ltRun[y]||0;
+    r.ltTax=calcLTCG(r.gain,filing,Math.max(0,agi-fd.std)+prior);
+    r.niit=calcNIIT(r.gain,filing,agi+prior+r.gain);
+    ltRun[y]=prior+r.gain;
+  });
+  rows.forEach(r=>{r.saleTax=r.stTax+r.ltTax+r.niit;r.totalTax=r.vestTax+r.saleTax;});
 }
 function computeAllVestEvents(){
   const rows=[];
@@ -2040,30 +2088,41 @@ function computeAllVestEvents(){
       const sharesSold=ov.sharesSold!=null?ov.sharesSold:0;const saleDate=ov.saleDate||'';const salePrice=ov.salePrice!=null?ov.salePrice:vestFMV;
       const lt=isLongTerm(ev.vestDate,saleDate);const gain=sharesSold*(salePrice-vestFMV);const filing=S.filing||'single';
       let stTax=0,ltTax=0,niit=0;
-      if(sharesSold>0&&saleDate){const magi=(S.comp.base||0)+incomeAtVest;if(lt){ltTax=Math.max(0,calcLTCG(Math.max(0,gain),filing,magi));niit=calcNIIT(Math.max(0,gain),filing,magi);}else{const fd=FED[filing];const taxableBase=Math.max(0,magi-fd.std);stTax=Math.max(0,calcFedTax(taxableBase+Math.max(0,gain),filing,0,1)-calcFedTax(taxableBase,filing,0,1));}}
       const grantYear=grant.grantDate?new Date(grant.grantDate).getFullYear():S.npvYear;
       const grantFMV=(grant.grantPricePerShare||0)*displayFactorForYear(grantYear);
-      rows.push({companyName:co.name,grantDate:grant.grantDate,vestDate:ev.vestDate,shares:ev.shares,grantFMV,vestFMV,incomeAtVest,sharesSold,saleDate,salePrice,gain,lt,stGain:lt?0:Math.max(0,gain),ltGain:lt?Math.max(0,gain):0,stTax,ltTax,niit,totalTax:stTax+ltTax+niit,ovKey,grantId:grant.id,companyId:co.id});
+      rows.push({companyName:co.name,grantDate:grant.grantDate,vestDate:ev.vestDate,shares:ev.shares,grantFMV,vestFMV,incomeAtVest,sharesSold,saleDate,salePrice,gain,lt,stGain:lt?0:Math.max(0,gain),ltGain:lt?Math.max(0,gain):0,stTax,ltTax,niit,vestTax:0,saleTax:0,totalTax:0,ovKey,grantId:grant.id,companyId:co.id});
     });
   });});
-  rows.sort((a,b)=>a.vestDate.localeCompare(b.vestDate));return rows;
+  rows.sort((a,b)=>a.vestDate.localeCompare(b.vestDate));applyRsuTaxes(rows);return rows;
 }
 function computeCompSummaryByYear(vestEvents){
   const c=S.comp;const salMap={};
-  (c.salaryYears||[]).forEach(row=>{const matchCeiling=row.base*(row.matchCap/100);const empMatch=Math.min(row.k401emp,matchCeiling)*(row.matchPct/100);const disc=c.espp.disc/100;const esppIncome=disc<1?row.base*(c.espp.pct/100)*disc/(1-disc):0;salMap[row.year]={base:row.base,k401emp:row.k401emp,match:empMatch,esppIncome};});
-  const byYear={};
-  vestEvents.forEach(ev=>{const yr=ev.vestDate?new Date(ev.vestDate).getFullYear():CUR_YEAR;if(!byYear[yr])byYear[yr]={rsuIncome:0,rsuTax:0,stGain:0,ltGain:0};byYear[yr].rsuIncome+=ev.incomeAtVest;byYear[yr].rsuTax+=ev.totalTax;byYear[yr].stGain+=ev.stGain;byYear[yr].ltGain+=ev.ltGain;});
+  (c.salaryYears||[]).forEach(row=>{const matchCeiling=row.base*(row.matchCap/100);const empMatch=Math.min(row.k401emp,matchCeiling)*(row.matchPct/100);const disc=c.espp.disc/100;const esppIncome=disc<1?row.base*(c.espp.pct/100)*disc/(1-disc):0;salMap[row.year]={base:row.base,bonus:row.bonus||0,k401emp:row.k401emp,match:empMatch,esppIncome};});
+  const byYear={};const bucket=y=>byYear[y]||(byYear[y]={rsuIncome:0,vestTax:0,saleTax:0,stGain:0,ltGain:0});
+  vestEvents.forEach(ev=>{
+    const v=bucket(ev.vestYear);v.rsuIncome+=ev.incomeAtVest;v.vestTax+=ev.vestTax;
+    if(ev.saleYear!=null){const sb=bucket(ev.saleYear);sb.saleTax+=ev.saleTax;sb.stGain+=ev.stGain;sb.ltGain+=ev.ltGain;}
+  });
   const allYears=new Set([...Object.keys(salMap).map(Number),...Object.keys(byYear).map(Number)]);
-  return[...allYears].sort((a,b)=>a-b).map(yr=>{const sal=salMap[yr]||{base:0,k401emp:0,match:0,esppIncome:0};const rsu=byYear[yr]||{rsuIncome:0,rsuTax:0,stGain:0,ltGain:0};const total=sal.base+rsu.rsuIncome+sal.match+sal.esppIncome;return{yr,base:sal.base,k401emp:sal.k401emp,match:sal.match,esppIncome:sal.esppIncome,rsuIncome:rsu.rsuIncome,rsuTax:rsu.rsuTax,stGain:rsu.stGain,ltGain:rsu.ltGain,total};});
+  return[...allYears].sort((a,b)=>a-b).map(yr=>{
+    const sal=salMap[yr]||{base:0,bonus:0,k401emp:0,match:0,esppIncome:0};
+    const rsu=byYear[yr]||{rsuIncome:0,vestTax:0,saleTax:0,stGain:0,ltGain:0};
+    const total=sal.base+sal.bonus+rsu.rsuIncome+sal.match+sal.esppIncome;
+    return{yr,base:sal.base,bonus:sal.bonus,k401emp:sal.k401emp,match:sal.match,esppIncome:sal.esppIncome,rsuIncome:rsu.rsuIncome,vestTax:rsu.vestTax,saleTax:rsu.saleTax,rsuTax:rsu.vestTax+rsu.saleTax,stGain:rsu.stGain,ltGain:rsu.ltGain,total,missingSalary:!salMap[yr]&&!!byYear[yr]};
+  });
 }
 function renderComp(){
   readCompInputs();renderCompSalaryTable();
   const vestEvents=computeAllVestEvents();const summaryRows=computeCompSummaryByYear(vestEvents);
-  document.getElementById('comp-summary-thead').innerHTML='<tr><th>Year</th><th>Base Salary</th><th>RSU Income</th><th>ESPP Income</th><th>401k Employee</th><th>401k Employer Match</th><th style="color:var(--green)">Total Comp</th><th>RSU Tax Owed</th></tr>';
-  document.getElementById('comp-summary-tbody').innerHTML=summaryRows.map(r=>`<tr><td style="font-weight:600">${r.yr}</td><td>${fmtFull(r.base)}</td><td>${r.rsuIncome>0?`<span style="color:var(--accent)">${fmtFull(r.rsuIncome)}</span>`:'—'}</td><td>${r.esppIncome>0?`<span style="color:var(--teal)">${fmtFull(r.esppIncome)}</span>`:'—'}</td><td>${r.k401emp>0?fmtFull(r.k401emp):'—'}</td><td>${r.match>0?`<span style="color:var(--green)">${fmtFull(r.match)}</span>`:'—'}</td><td style="font-weight:700;color:var(--green)">${fmtFull(r.total)}</td><td style="color:${r.rsuTax>0?'var(--red)':'var(--text3)'}">${r.rsuTax>0?fmtFull(r.rsuTax):'—'}</td></tr>`).join('');
+  document.getElementById('comp-summary-thead').innerHTML='<tr><th>Year</th><th>Base Salary</th><th>Bonus</th><th>RSU Income</th><th>ESPP Income</th><th>401k Employee</th><th>401k Employer Match</th><th style="color:var(--green)">Total Comp</th><th>RSU Vest Tax</th><th>RSU Sale Tax</th><th>Total RSU Tax</th></tr>';
+  const taxCell=v=>`<td style="color:${v>0?'var(--red)':'var(--text3)'}">${v>0?fmtFull(v):'—'}</td>`;
+  document.getElementById('comp-summary-tbody').innerHTML=summaryRows.map(r=>`<tr><td style="font-weight:600">${r.yr}${r.missingSalary?` <span title="No salary row for ${r.yr}" style="color:var(--yellow)">⚠</span>`:''}</td><td>${fmtFull(r.base)}</td><td>${r.bonus>0?`<span style="color:var(--yellow)">${fmtFull(r.bonus)}</span>`:'—'}</td><td>${r.rsuIncome>0?`<span style="color:var(--accent)">${fmtFull(r.rsuIncome)}</span>`:'—'}</td><td>${r.esppIncome>0?`<span style="color:var(--teal)">${fmtFull(r.esppIncome)}</span>`:'—'}</td><td>${r.k401emp>0?fmtFull(r.k401emp):'—'}</td><td>${r.match>0?`<span style="color:var(--green)">${fmtFull(r.match)}</span>`:'—'}</td><td style="font-weight:700;color:var(--green)">${fmtFull(r.total)}</td>${taxCell(r.vestTax)}${taxCell(r.saleTax)}${taxCell(r.rsuTax)}</tr>`).join('');
+  const missing=summaryRows.filter(r=>r.missingSalary).map(r=>r.yr);
+  const warnEl=document.getElementById('comp-summary-warn');
+  if(warnEl)warnEl.textContent=missing.length?`⚠ ${missing.join(', ')}: no row in Base Salary & Benefits, so taxes for ${missing.length>1?'these years are':'this year is'} calculated on RSU/sale income alone. Click "+ Add Year" to include base and bonus.`:'';
   const detailTbody=document.getElementById('comp-rsu-detail-tbody');
-  if(!vestEvents.length){detailTbody.innerHTML='<tr><td colspan="16" style="text-align:center;color:var(--text3);padding:16px">No RSU grants added yet</td></tr>';}
-  else detailTbody.innerHTML=vestEvents.map(ev=>`<tr><td style="font-weight:600">${esc(ev.companyName)}</td><td style="color:var(--text3)">${ev.grantDate}</td><td>${ev.vestDate}</td><td>${ev.shares.toLocaleString()}</td><td>${fmtFull(ev.grantFMV)}</td><td>${fmtFull(ev.vestFMV)}</td><td style="color:var(--accent)">${fmtFull(ev.incomeAtVest)}</td><td><input type="number" value="${ev.sharesSold||''}" placeholder="0" min="0" max="${ev.shares}" style="width:70px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','sharesSold',parseInt(this.value)||0)"/></td><td><input type="date" value="${ev.saleDate||''}" style="width:120px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','saleDate',this.value)"/></td><td><div class="ci-wrap" style="width:90px"><span class="ci-prefix">$</span><input type="text" value="${ev.salePrice?Math.round(ev.salePrice).toLocaleString():''}" placeholder="${fmtFull(ev.vestFMV)}" style="padding-left:14px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" oninput="fmtCI(this)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','salePrice',parseFloat(this.value.replace(/,/g,''))||0)"/></div></td><td style="color:var(--red)">${ev.stGain>0?fmtFull(ev.stGain):'—'}</td><td style="color:var(--green)">${ev.ltGain>0?fmtFull(ev.ltGain):'—'}</td><td style="color:var(--red)">${ev.stTax>0?fmtFull(ev.stTax):'—'}</td><td style="color:var(--green)">${ev.ltTax>0?fmtFull(ev.ltTax):'—'}</td><td style="color:var(--yellow)">${ev.niit>0?fmtFull(ev.niit):'—'}</td><td style="font-weight:700;color:${ev.totalTax>0?'var(--red)':'var(--text3)'}">${ev.totalTax>0?fmtFull(ev.totalTax):'—'}</td></tr>`).join('');
+  if(!vestEvents.length){detailTbody.innerHTML='<tr><td colspan="17" style="text-align:center;color:var(--text3);padding:16px">No RSU grants added yet</td></tr>';}
+  else detailTbody.innerHTML=vestEvents.map(ev=>`<tr><td style="font-weight:600">${esc(ev.companyName)}</td><td style="color:var(--text3)">${ev.grantDate}</td><td>${ev.vestDate}</td><td>${ev.shares.toLocaleString()}</td><td>${fmtFull(ev.grantFMV)}</td><td>${fmtFull(ev.vestFMV)}</td><td style="color:var(--accent)">${fmtFull(ev.incomeAtVest)}</td><td style="color:var(--red)">${ev.vestTax>0?fmtFull(ev.vestTax):'—'}</td><td><input type="number" value="${ev.sharesSold||''}" placeholder="0" min="0" max="${ev.shares}" style="width:70px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','sharesSold',parseInt(this.value)||0)"/></td><td><input type="date" value="${ev.saleDate||''}" style="width:120px;padding:2px 5px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','saleDate',this.value)"/></td><td><div class="ci-wrap" style="width:90px"><span class="ci-prefix">$</span><input type="text" value="${ev.salePrice?Math.round(ev.salePrice).toLocaleString():''}" placeholder="${fmtFull(ev.vestFMV)}" style="padding-left:14px;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text)" oninput="fmtCI(this)" onblur="setRSUSaleOv('${ev.grantId}','${ev.vestDate}','salePrice',parseFloat(this.value.replace(/,/g,''))||0)"/></div></td><td style="color:var(--red)">${ev.stGain>0?fmtFull(ev.stGain):'—'}</td><td style="color:var(--green)">${ev.ltGain>0?fmtFull(ev.ltGain):'—'}</td><td style="color:var(--red)">${ev.stTax>0?fmtFull(ev.stTax):'—'}</td><td style="color:var(--green)">${ev.ltTax>0?fmtFull(ev.ltTax):'—'}</td><td style="color:var(--yellow)">${ev.niit>0?fmtFull(ev.niit):'—'}</td><td style="font-weight:700;color:${ev.totalTax>0?'var(--red)':'var(--text3)'}">${ev.totalTax>0?fmtFull(ev.totalTax):'—'}</td></tr>`).join('');
   renderCompanyCards();
 }
 function setRSUSaleOv(grantId,vestDate,field,val){
@@ -2290,10 +2349,11 @@ function _applyJSON(text){
     if(!saved.actualized)saved.actualized={};
     if(!saved.comp)saved.comp={salaryYears:[],companies:[],espp:{pct:10,disc:15}};
     if(!saved.comp.salaryYears)saved.comp.salaryYears=[];
+    saved.comp.salaryYears.forEach(r=>{if(r.bonus==null)r.bonus=0;});
     if(!saved.comp.companies)saved.comp.companies=[];
     if(!saved.comp.espp)saved.comp.espp={pct:10,disc:15};
     if(saved.comp.base!=null&&saved.comp.year&&saved.comp.salaryYears.length===0)
-      saved.comp.salaryYears=[{year:saved.comp.year,base:saved.comp.base||0,k401emp:saved.comp.k401emp||0,matchPct:saved.comp.k401matchPct||100,matchCap:saved.comp.k401matchCap||6}];
+      saved.comp.salaryYears=[{year:saved.comp.year,base:saved.comp.base||0,bonus:0,k401emp:saved.comp.k401emp||0,matchPct:saved.comp.k401matchPct||100,matchCap:saved.comp.k401matchCap||6}];
     if(saved.scenarios)saved.scenarios.forEach(s=>{s._open=false;});
     Object.assign(S,saved);
     applyStateToUI();

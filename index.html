@@ -2047,7 +2047,7 @@ function compYearOrdinary(){
 // Sale tax: booked to the SALE year; ST gains stack on ordinary income, LT gains stack above that.
 function applyRsuTaxes(rows){
   const filing=S.filing||'single';const fd=FED[filing]||FED.single;
-  const yrOf=d=>d?new Date(d).getFullYear():null;
+  const yrOf=d=>d?(parseInt(String(d).slice(0,4),10)||null):null; // parse the string: new Date('YYYY-01-01') lands in the prior year in US time zones
   const base=compYearOrdinary();const ord={};const ltRun={};
   const getOrd=y=>{if(ord[y]==null)ord[y]=base[y]?base[y].ord:0;return ord[y];};
   const fedTax=x=>calcFedTax(x,filing,0,1);
